@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>유아 구강보건교육 효과 모니터링 설문지 | 동구보건소 × 울산과학대학교 치위생학과</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  // Tailwind 동적 클래스(예: text-teal-700, text-amber-700) 안정 보장용 safelist
+  tailwind.config = {
+    safelist: [
+      'text-teal-50','text-teal-100','text-teal-600','text-teal-700','text-teal-800',
+      'bg-teal-50','bg-teal-100','bg-teal-600','bg-teal-700',
+      'border-teal-100','border-teal-200','border-teal-300','border-teal-400','border-teal-500',
+      'focus:ring-teal-400','accent-teal-600','hover:bg-teal-700','from-teal-500','to-cyan-600',
+      'text-amber-50','text-amber-100','text-amber-600','text-amber-700','text-amber-800',
+      'bg-amber-50','bg-amber-100','bg-amber-500','bg-amber-600',
+      'border-amber-100','border-amber-200','border-amber-300','border-amber-400','border-amber-500',
+      'focus:ring-amber-400','accent-amber-600','hover:bg-amber-600','from-amber-500','to-orange-500',
+    ]
+  };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet">
+<style>
+  :root{
+    --teal-50:#f0fdfa; --teal-100:#ccfbf1; --teal-500:#14b8a6; --teal-600:#0d9488; --teal-700:#0f766e;
+    --rose-500:#f43f5e; --amber-500:#f59e0b;
+  }
+  *{font-family:'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;}
+  body{background:linear-gradient(135deg,#f0fdfa 0%, #e0f2fe 100%); min-height:100vh;}
+  .fade-in{animation: fadeIn .4s ease-out;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px);} to{opacity:1;transform:translateY(0);}}
+  .pulse-warn{animation: pulse 2s infinite;}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(244,63,94,.4);} 50%{box-shadow:0 0 0 14px rgba(244,63,94,0);}}
+  .radio-card{transition:all .15s;}
+  .radio-card:has(input:checked){border-color:#0d9488; background:#f0fdfa;}
+  .check-card{transition:all .15s;}
+  .check-card:has(input:checked){border-color:#0d9488; background:#f0fdfa;}
+  .step-active{background:#0d9488; color:white;}
+  .step-done{background:#14b8a6; color:white;}
+  .tab-active{border-bottom:3px solid #0d9488; color:#0f766e; font-weight:600;}
+  /* PDF 캡처용 영역 */
+  #pdfReport{background:white; padding:40px; width:794px;}
+  ::-webkit-scrollbar{width:8px; height:8px;}
+  ::-webkit-scrollbar-thumb{background:#94a3b8; border-radius:8px;}
+</style>
+</head>
+<body class="text-slate-800">
+<!-- ============================ HEADER ============================ -->
+<header class="bg-white shadow-sm border-b border-teal-100 sticky top-0 z-40">
+  <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center text-white text-2xl shadow-md">🦷</div>
+      <div>
+        <h1 class="text-base sm:text-lg font-bold text-teal-800 leading-tight">유아 구강보건교육 효과 모니터링</h1>
+        <p class="text-xs text-slate-500">동구보건소 × 울산과학대학교 치위생학과</p>
+      </div>
+    </div>
+    <button onclick="goAdmin()" class="text-xs sm:text-sm px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium transition flex items-center gap-1">
+      <span>🔒</span><span class="hidden sm:inline">관리자</span>
+    </button>
+  </div>
+</header>
+
+<!-- ============================ MAIN ============================ -->
+<main id="app" class="max-w-4xl mx-auto px-4 py-6 sm:py-10"></main>
+
+<!-- ============================ FOOTER ============================ -->
+<footer class="text-center text-xs text-slate-500 py-6 border-t border-slate-200 bg-white/60 mt-12">
+  <p>© 2026 동구보건소 · 울산과학대학교 치위생학과</p>
+  <p class="mt-1">문의: 유진실 교수 ☎ 010.2494.3875 ✉ jsyu@uc.ac.kr</p>
+</footer>
+
+<!-- ============================ SCRIPTS ============================ -->
+<script>
+/* ====== Supabase 설정 ====== */
+const SUPABASE_URL = 'https://yzycbpugeswycjouldmd.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6eWNicHVnZXN3eWNqb3VsZG1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0MjUwNzQsImV4cCI6MjA5MjAwMTA3NH0.cuXYGebhnaljK6tyYqNR14QfdH2hj7fR7nTHYTtnLZM';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/* ====== 데이터 저장소 (Supabase + localStorage 캐시) ====== */
+const CACHE_KEY = 'oral_health_survey_cache_v2';
+let cachedDB = { pre:[], post:[] };
+
+function loadDB(){ return cachedDB; }   // 동기 호출용 (캐시 반환)
+
+async function fetchDB(){
+  try {
+    const [{data: pre, error: e1}, {data: post, error: e2}] = await Promise.all([
+      sb.from('pre_surveys').select('*').order('submitted_at', {ascending:false}),
+      sb.from('post_surveys').select('*').order('submitted_at', {ascending:false}),
+    ]);
+    if(e1) throw e1; if(e2) throw e2;
+    cachedDB = {
+      pre:  (pre  || []).map(rowFromSupabase),
+      post: (post || []).map(rowFromSupabase),
+    };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(cachedDB));
+    return cachedDB;
+  } catch(err) {
+    console.error('Supabase fetch 실패, 캐시 사용:', err);
+    try {
+      const c = JSON.parse(localStorage.getItem(CACHE_KEY)||'null');
+      if(c) cachedDB = c;
+    } catch(e){}
+    return cachedDB;
+  }
+}
+
+// Supabase row(snake_case + jsonb) → 앱 row(camelCase + array)
+function rowFromSupabase(r){
+  return {
+    id: r.id,
+    submittedAt: r.submitted_at,
+    kindergarten: r.kindergarten,
+    childName: r.child_name,
+    guardianName: r.guardian_name,
+    relation: r.relation,
+    gender: r.gender,
+    age: r.age,
+    q1: r.q1 || [],
+    q2: r.q2,
+    q3: r.q3,
+    q4: r.q4,
+    q5: r.q5 || [],
+    q6: r.q6,
+    q7a: r.q7a,
+    q7b: r.q7b || [],
+    q7b_etc: r.q7b_etc || '',
+    q8: r.q8,
+    q9: r.q9,
+  };
+}
+
+// 앱 row → Supabase row(snake_case)
+function rowToSupabase(d, type){
+  const row = {
+    kindergarten: d.kindergarten,
+    child_name: d.childName,
+    guardian_name: d.guardianName,
+    relation: d.relation,
+    gender: d.gender,
+    age: d.age,
+    q1: d.q1, q2: d.q2, q3: d.q3, q4: d.q4, q5: d.q5,
+    q6: d.q6, q7a: d.q7a, q7b: d.q7b, q7b_etc: d.q7b_etc || null, q8: d.q8,
+  };
+  if(type === 'post') row.q9 = d.q9;
+  return row;
+}
+
+/* ====== 설문 정의 (PDF 기준) ====== */
+const COMMON_Q = [
+  { id:'q1', type:'check', label:'1. 우리 아이는 지금까지 구강보건교육(치아 건강 교육)을 받은 적이 있습니까?', sub:'(중복 응답 가능)',
+    options:['유치원·어린이집','치과 병·의원','보건소','가정','받은 적 없음'] },
+  { id:'q2', type:'number', label:'2. 우리 아이는 하루에 평균 몇 번 칫솔질을 합니까?', sub:'평균 ( ) 회', min:0, max:20 },
+  { id:'q3', type:'radio', label:'3. 우리 아이는 칫솔질을 스스로 하나요?',
+    options:['처음부터 끝까지 스스로 한다','대부분 스스로 하지만 일부는 도와준다','거의 부모가 닦아준다'] },
+  { id:'q4', type:'radio', label:'4. 우리 아이는 어떤 방법으로 칫솔질을 합니까?',
+    options:['칫솔을 좌·우로 움직여서 닦는다','칫솔을 위·아래로 움직여서 닦는다','입을 다물고 둥글게 원을 그리면서 닦는다','손목을 회전시키며 위·아래로 쓸어내리듯이 닦는다','아무렇게나 편한 대로 닦는다'] },
+  { id:'q5', type:'check', label:'5. 우리 아이가 칫솔질을 하는 시기를 모두 체크해 주세요.', sub:'(평상시 기준, 중복 응답)',
+    options:['아침 식사 전','아침 식사 후','점심 식사 후','저녁 식사 후','잠자기 전','간식 후'] },
+  { id:'q6', type:'radio', label:'6. 아이가 칫솔질을 마친 후, 부모님이 직접 확인하고 한 번 더 닦아주십니까?',
+    options:['매번 확인하고 마무리 양치를 해 준다','가끔 확인하고 마무리 양치를 해 준다','확인만 하고 다시 닦아주지는 않는다','확인하지 않는다'] },
+  { id:'q7a', type:'number', label:'7. 우리 아이는 하루에 간식을 평균 몇 번 먹습니까?', sub:'평균 ( ) 회 (1일 기준)', min:0, max:20 },
+  { id:'q7b', type:'check', label:'※ 간식 종류를 모두 체크해 주세요.', sub:'(중복 응답)',
+    options:['과자류','사탕류','탄산음료','초콜릿류','아이스크림','과일·채소','우유·요거트','기타'], allowEtc:true },
+  { id:'q8', type:'radio', label:"8. 우리 아이는 '불소'가 어떤 역할을 하는지 이해하고 있습니까?",
+    options:['잘 이해하고 설명할 수 있다 (예: "치아를 튼튼하게 해 줘요")','들어본 적은 있고 대략적으로 안다','이름은 들어봤지만 무슨 뜻인지 모른다','전혀 모른다'] },
+];
+const POST_EXTRA_Q = [
+  { id:'q9', type:'radio', label:'9. 교육 내용, 환경 및 지원 사항을 고려할 때, 참여한 프로그램이 만족스러웠습니까?',
+    options:['매우 그렇다','다소 그렇다','보통이다','그렇지 않다'] },
+];
+
+/* ====== 라우팅 ====== */
+let currentRoute = 'home';
+function go(route){ currentRoute = route; render(); window.scrollTo({top:0, behavior:'smooth'}); }
+
+function render(){
+  const app = document.getElementById('app');
+  if(currentRoute === 'home') app.innerHTML = renderHome();
+  else if(currentRoute === 'pre') app.innerHTML = renderSurvey('pre');
+  else if(currentRoute === 'post') app.innerHTML = renderSurvey('post');
+  else if(currentRoute === 'admin-login') app.innerHTML = renderAdminLogin();
+  else if(currentRoute === 'admin') app.innerHTML = renderAdmin();
+  else if(currentRoute === 'thanks-pre') app.innerHTML = renderThanks('pre');
+  else if(currentRoute === 'thanks-post') app.innerHTML = renderThanks('post');
+  app.classList.remove('fade-in'); void app.offsetWidth; app.classList.add('fade-in');
+  if(currentRoute === 'admin') drawAdminCharts();
+}
+
+/* ====== 홈 화면 ====== */
+function renderHome(){
+  const db = loadDB();
+  const preCount = db.pre.length;
+  const postCount = db.post.length;
+  return `
+  <!-- 안내 박스 (강조) -->
+  <div class="bg-gradient-to-r from-rose-50 to-amber-50 border-2 border-rose-300 rounded-2xl p-5 sm:p-6 shadow-md pulse-warn mb-6">
+    <div class="flex items-start gap-3">
+      <div class="text-3xl flex-shrink-0">⚠️</div>
+      <div>
+        <h2 class="text-lg sm:text-xl font-bold text-rose-700 mb-1">반드시 사전 · 사후 설문을 모두 작성해 주세요!</h2>
+        <p class="text-sm sm:text-base text-slate-700 leading-relaxed">
+          본 프로그램의 효과를 정확히 평가하기 위해서는 <b class="text-rose-600">교육 시작 전 '사전 설문'</b>과
+          <b class="text-rose-600">교육 종료 후 '사후 설문'</b>이 모두 필요합니다.<br>
+          한 가지만 작성된 응답은 분석에서 제외될 수 있습니다.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 메인 카드 -->
+  <div class="bg-white rounded-2xl shadow-lg p-6 sm:p-8 border border-teal-100">
+    <div class="text-center mb-6">
+      <div class="inline-block text-5xl mb-3">🦷✨</div>
+      <h2 class="text-2xl sm:text-3xl font-bold text-teal-800">유아 구강보건교육 효과 모니터링</h2>
+      <p class="text-sm text-slate-500 mt-2">2026년 동구보건소 연계 · 울산과학대학교 치위생학과</p>
+    </div>
+
+    <div class="bg-slate-50 rounded-xl p-4 sm:p-5 text-sm text-slate-700 leading-relaxed mb-6">
+      <p>안녕하십니까? 본 설문은 2026년 동구보건소 연계 울산과학대학교 치위생학과에서 시행될 구강보건교육의 효과를 평가하기 위한 조사입니다.</p>
+      <p class="mt-2">아동의 평소 행동을 직접 관찰하시거나, 아동에게 질문하여 들으신 내용을 바탕으로 솔직하게 답변해 주시기 바랍니다.</p>
+      <p class="mt-2 text-xs text-slate-500">※ 응답 내용은 구강보건교육 효과 평가 및 관련 학술 자료로만 활용되며, 그 외의 목적으로는 사용되지 않습니다.</p>
+    </div>
+
+    <!-- 두 개의 큰 버튼 -->
+    <div class="grid sm:grid-cols-2 gap-4">
+      <button onclick="go('pre')" class="group relative bg-gradient-to-br from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white rounded-2xl p-6 text-left shadow-lg hover:shadow-xl transition transform hover:-translate-y-1">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-3xl">📝</span>
+          <span class="text-xs bg-white/20 px-2 py-1 rounded-full">STEP 1</span>
+        </div>
+        <h3 class="text-xl font-bold mb-1">사전 설문</h3>
+        <p class="text-sm text-teal-50 leading-relaxed">교육 <b>시작 전</b>에 작성해 주세요.</p>
+        <div class="mt-4 text-xs text-teal-100 flex items-center gap-2">
+          <span>총 8문항 · 약 3분</span>
+          <span class="ml-auto bg-white/20 px-2 py-0.5 rounded">현재 ${preCount}건</span>
+        </div>
+      </button>
+
+      <button onclick="go('post')" class="group relative bg-gradient-to-br from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-2xl p-6 text-left shadow-lg hover:shadow-xl transition transform hover:-translate-y-1">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-3xl">✅</span>
+          <span class="text-xs bg-white/20 px-2 py-1 rounded-full">STEP 2</span>
+        </div>
+        <h3 class="text-xl font-bold mb-1">사후 설문</h3>
+        <p class="text-sm text-amber-50 leading-relaxed">교육 <b>종료 후</b>에 작성해 주세요.</p>
+        <div class="mt-4 text-xs text-amber-100 flex items-center gap-2">
+          <span>총 9문항 · 약 3분</span>
+          <span class="ml-auto bg-white/20 px-2 py-0.5 rounded">현재 ${postCount}건</span>
+        </div>
+      </button>
+    </div>
+
+    <!-- 진행 안내 -->
+    <div class="mt-6 bg-teal-50 rounded-xl p-4 border border-teal-200">
+      <p class="text-sm text-teal-800 flex items-start gap-2">
+        <span>💡</span>
+        <span><b>작성 순서:</b> ① 교육 시작 전 → 사전 설문 작성 / ② 교육 모두 종료 후 → 사후 설문 작성</span>
+      </p>
+    </div>
+  </div>
+  `;
+}
+
+/* ====== 설문 폼 ====== */
+function renderSurvey(type){
+  const isPre = type === 'pre';
+  const title = isPre ? '사전 설문지' : '사후 설문지';
+  const colorBg = isPre ? 'from-teal-500 to-cyan-600' : 'from-amber-500 to-orange-500';
+  const colorText = isPre ? 'teal' : 'amber';
+  const questions = isPre ? COMMON_Q : [...COMMON_Q, ...POST_EXTRA_Q];
+
+  return `
+  <button onclick="go('home')" class="text-sm text-slate-500 hover:text-slate-700 mb-4 flex items-center gap-1">← 처음으로</button>
+
+  <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-${colorText}-100">
+    <div class="bg-gradient-to-r ${colorBg} text-white p-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs opacity-90 mb-1">${isPre ? '🟢 STEP 1 / 교육 시작 전' : '🟡 STEP 2 / 교육 종료 후'}</p>
+          <h2 class="text-2xl font-bold">유아 구강보건교육 ${title}</h2>
+        </div>
+        <div class="text-4xl">${isPre ? '📝' : '✅'}</div>
+      </div>
+    </div>
+
+    <form id="surveyForm" class="p-5 sm:p-7 space-y-6" onsubmit="event.preventDefault(); submitSurvey('${type}');">
+      <!-- 동의 섹션 -->
+      <section class="bg-slate-50 rounded-xl p-4 border border-slate-200">
+        <h3 class="font-bold text-slate-800 mb-2">📋 설문 참여 동의</h3>
+        <p class="text-xs text-slate-600 leading-relaxed mb-3">
+          본인은 본 설문 참여가 자발적이고 언제든지 철회할 수 있음을 이해하였습니다.
+          또한 응답 내용은 구강보건교육 효과 평가 및 관련 학술 자료로만 활용되며, 그 외의 목적으로는 사용되지 않음에 동의합니다.
+        </p>
+        <label class="flex items-center gap-2 text-sm font-semibold text-${colorText}-700 cursor-pointer">
+          <input type="checkbox" name="consent" required class="w-5 h-5 accent-${colorText}-600">
+          위 내용에 동의하며, 본 설문 조사에 참여하는 것에 동의합니다.
+        </label>
+      </section>
+
+      <!-- 대상자 정보 -->
+      <section>
+        <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-2">
+          <span class="bg-${colorText}-100 text-${colorText}-700 text-xs px-2 py-1 rounded">대상자 정보</span>
+        </h3>
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">유치원명 <span class="text-rose-500">*</span></label>
+            <input type="text" name="kindergarten" required placeholder="예: ○○유치원" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-${colorText}-400 focus:border-transparent outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">아동 성명 <span class="text-rose-500">*</span></label>
+            <input type="text" name="childName" required placeholder="예: 홍길동" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-${colorText}-400 focus:border-transparent outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">주양육자 성명 <span class="text-rose-500">*</span></label>
+            <input type="text" name="guardianName" required placeholder="예: 홍부모" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-${colorText}-400 focus:border-transparent outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">양육자와 아동의 관계 <span class="text-rose-500">*</span></label>
+            <select name="relation" required class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-${colorText}-400 focus:border-transparent outline-none bg-white">
+              <option value="">선택해 주세요</option>
+              <option value="부">부</option><option value="모">모</option><option value="조부모">조부모</option><option value="기타">기타</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">아동 성별 <span class="text-rose-500">*</span></label>
+            <div class="flex gap-2">
+              ${['남','여'].map(g=>`
+              <label class="radio-card flex-1 border-2 border-slate-200 rounded-lg px-4 py-2.5 cursor-pointer text-center font-medium">
+                <input type="radio" name="gender" value="${g}" required class="hidden">${g}
+              </label>`).join('')}
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">아동 연령 <span class="text-rose-500">*</span></label>
+            <div class="flex gap-2">
+              ${['5세','6세','7세'].map(a=>`
+              <label class="radio-card flex-1 border-2 border-slate-200 rounded-lg px-4 py-2.5 cursor-pointer text-center font-medium">
+                <input type="radio" name="age" value="${a}" required class="hidden">${a}
+              </label>`).join('')}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <hr class="border-slate-200">
+
+      <!-- 본 문항 -->
+      <section class="space-y-6">
+        <h3 class="font-bold text-slate-800 flex items-center gap-2">
+          <span class="bg-${colorText}-100 text-${colorText}-700 text-xs px-2 py-1 rounded">설문 문항</span>
+          <span class="text-xs text-slate-500">아래 문항을 읽으시고 우리 아이의 평소 모습에 해당하는 곳에 체크 또는 숫자를 적어 주세요.</span>
+        </h3>
+        ${questions.map(q => renderQuestion(q, colorText)).join('')}
+      </section>
+
+      <!-- 제출 버튼 -->
+      <div class="pt-4 border-t border-slate-200">
+        <button type="submit" class="w-full bg-gradient-to-r ${colorBg} hover:opacity-95 text-white font-bold py-4 rounded-xl shadow-md text-lg transition">
+          ${isPre ? '사전 설문 제출하기' : '사후 설문 제출하기'} →
+        </button>
+        <p class="text-center text-xs text-slate-500 mt-3">제출 후 ${isPre ? '교육 종료 후 반드시 \'사후 설문\'도 작성해 주세요!' : '수고하셨습니다. 결과는 분석에 소중히 활용됩니다.'}</p>
+      </div>
+    </form>
+  </div>
+  `;
+}
+
+function renderQuestion(q, color){
+  const required = q.type !== 'check' ? 'required' : '';
+  if(q.type === 'radio'){
+    return `
+    <div class="bg-slate-50/50 rounded-xl p-4 border border-slate-200">
+      <p class="font-semibold text-slate-800 mb-3">${q.label}</p>
+      ${q.sub?`<p class="text-xs text-slate-500 mb-2">${q.sub}</p>`:''}
+      <div class="space-y-2">
+        ${q.options.map((opt,i)=>`
+          <label class="radio-card flex items-center gap-3 border-2 border-slate-200 rounded-lg px-4 py-3 cursor-pointer hover:bg-white">
+            <input type="radio" name="${q.id}" value="${i+1}" ${required} class="w-4 h-4 accent-${color}-600">
+            <span class="text-sm">${i+1>9?'⑩':['①','②','③','④','⑤','⑥','⑦','⑧','⑨'][i]} ${opt}</span>
+          </label>`).join('')}
+      </div>
+    </div>`;
+  }
+  if(q.type === 'check'){
+    return `
+    <div class="bg-slate-50/50 rounded-xl p-4 border border-slate-200">
+      <p class="font-semibold text-slate-800 mb-1">${q.label}</p>
+      ${q.sub?`<p class="text-xs text-slate-500 mb-3">${q.sub}</p>`:''}
+      <div class="grid sm:grid-cols-2 gap-2">
+        ${q.options.map((opt,i)=>`
+          <label class="check-card flex items-center gap-3 border-2 border-slate-200 rounded-lg px-4 py-3 cursor-pointer hover:bg-white">
+            <input type="checkbox" name="${q.id}" value="${opt}" class="w-4 h-4 accent-${color}-600">
+            <span class="text-sm">${opt}</span>
+          </label>`).join('')}
+      </div>
+      ${q.allowEtc?`<input type="text" name="${q.id}_etc" placeholder="기타 종류 입력" class="mt-3 w-full px-4 py-2 rounded-lg border border-slate-300 text-sm">`:''}
+    </div>`;
+  }
+  if(q.type === 'number'){
+    return `
+    <div class="bg-slate-50/50 rounded-xl p-4 border border-slate-200">
+      <p class="font-semibold text-slate-800 mb-1">${q.label}</p>
+      ${q.sub?`<p class="text-xs text-slate-500 mb-3">${q.sub}</p>`:''}
+      <div class="flex items-center gap-2">
+        <span class="text-sm text-slate-600">평균</span>
+        <input type="number" name="${q.id}" required min="${q.min||0}" max="${q.max||50}" class="w-28 px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-${color}-400 outline-none text-center font-semibold">
+        <span class="text-sm text-slate-600">회</span>
+      </div>
+    </div>`;
+  }
+}
+
+/* ====== 제출 처리 ====== */
+async function submitSurvey(type){
+  const form = document.getElementById('surveyForm');
+  const submitBtn = form.querySelector('button[type="submit"]');
+  if(submitBtn){ submitBtn.disabled = true; submitBtn.innerHTML = '⏳ 제출 중...'; }
+
+  const data = {};
+  ['kindergarten','childName','guardianName','relation','gender','age'].forEach(k=>{
+    data[k] = form.elements[k].value.trim();
+  });
+  const questions = type==='pre' ? COMMON_Q : [...COMMON_Q, ...POST_EXTRA_Q];
+  for(const q of questions){
+    if(q.type === 'check'){
+      const checked = Array.from(form.querySelectorAll(`input[name="${q.id}"]:checked`)).map(i=>i.value);
+      data[q.id] = checked;
+      if(q.allowEtc){
+        const etc = form.elements[`${q.id}_etc`]?.value?.trim();
+        if(etc) data[`${q.id}_etc`] = etc;
+      }
+    } else if(q.type === 'radio'){
+      const sel = form.querySelector(`input[name="${q.id}"]:checked`);
+      data[q.id] = sel ? Number(sel.value) : null;
+    } else if(q.type === 'number'){
+      data[q.id] = Number(form.elements[q.id].value);
+    }
+  }
+
+  // Supabase insert
+  try {
+    const table = type === 'pre' ? 'pre_surveys' : 'post_surveys';
+    const { error } = await sb.from(table).insert([rowToSupabase(data, type)]);
+    if(error) throw error;
+    await fetchDB();
+    go('thanks-' + type);
+  } catch(err) {
+    alert('제출 중 오류가 발생했습니다.\n\n' + (err?.message || err) + '\n\n네트워크 상태를 확인하시고 다시 시도해 주세요.');
+    if(submitBtn){ submitBtn.disabled = false; submitBtn.innerHTML = type==='pre'?'사전 설문 제출하기 →':'사후 설문 제출하기 →'; }
+  }
+}
+
+/* ====== 감사 페이지 ====== */
+function renderThanks(type){
+  const isPre = type === 'pre';
+  return `
+  <div class="bg-white rounded-2xl shadow-lg p-8 sm:p-12 text-center border border-teal-100 fade-in">
+    <div class="text-7xl mb-4">${isPre ? '🌱' : '🎉'}</div>
+    <h2 class="text-2xl sm:text-3xl font-bold text-teal-800 mb-3">제출이 완료되었습니다!</h2>
+    <p class="text-slate-600 mb-6">소중한 응답에 감사드립니다 :)</p>
+    ${isPre ? `
+    <div class="bg-rose-50 border-2 border-rose-300 rounded-xl p-5 mb-6 text-left">
+      <p class="font-bold text-rose-700 mb-2 flex items-center gap-2">⚠️ 잊지 말고 꼭 기억해 주세요!</p>
+      <p class="text-sm text-slate-700 leading-relaxed">
+        <b class="text-rose-600">교육이 모두 종료된 후</b>, 효과 평가를 위해
+        <b class="text-rose-600">반드시 '사후 설문'도 작성</b>해 주셔야 합니다.<br>
+        한 가지만 작성된 응답은 분석에서 제외될 수 있습니다.
+      </p>
+    </div>
+    ` : `
+    <div class="bg-teal-50 border border-teal-200 rounded-xl p-5 mb-6 text-left">
+      <p class="text-sm text-teal-800 leading-relaxed">
+        사전·사후 설문이 모두 완료되었습니다. 보내주신 응답은 구강보건교육 프로그램의 효과를 평가하고
+        더 좋은 교육을 설계하는 데 소중하게 활용됩니다. 감사합니다 :)
+      </p>
+    </div>
+    `}
+    <button onclick="go('home')" class="px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-xl shadow">처음으로 돌아가기</button>
+  </div>
+  `;
+}
+
+/* ====== 관리자 ====== */
+function goAdmin(){ go('admin-login'); }
+function renderAdminLogin(){
+  return `
+  <div class="max-w-md mx-auto bg-white rounded-2xl shadow-lg p-8 border border-slate-200">
+    <div class="text-center mb-6">
+      <div class="text-5xl mb-2">🔒</div>
+      <h2 class="text-xl font-bold text-slate-800">관리자 로그인</h2>
+      <p class="text-xs text-slate-500 mt-1">데이터 조회 및 보고서 다운로드</p>
+    </div>
+    <form onsubmit="event.preventDefault(); checkAdminPassword();" class="space-y-3">
+      <input id="adminPwd" type="password" placeholder="관리자 비밀번호" autofocus class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-teal-400 outline-none">
+      <button type="submit" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 rounded-lg">로그인</button>
+      <button type="button" onclick="go('home')" class="w-full text-sm text-slate-500 hover:text-slate-700 py-2">← 처음으로</button>
+    </form>
+    <p id="pwdError" class="text-xs text-rose-600 text-center mt-3 hidden">비밀번호가 올바르지 않습니다.</p>
+  </div>
+  `;
+}
+async function checkAdminPassword(){
+  const v = document.getElementById('adminPwd').value;
+  if(v === '0526'){
+    const btn = document.querySelector('#app button[type="submit"]');
+    if(btn){ btn.disabled = true; btn.innerHTML = '⏳ 데이터 불러오는 중...'; }
+    await fetchDB();
+    go('admin');
+  } else {
+    document.getElementById('pwdError').classList.remove('hidden');
+  }
+}
+
+let adminTab = 'overview';
+async function setAdminTab(t){ adminTab = t; await fetchDB(); render(); }
+async function refreshAdmin(){
+  const btn = document.getElementById('btnRefresh');
+  if(btn){ btn.disabled = true; btn.innerHTML = '⏳'; }
+  await fetchDB();
+  render();
+}
+
+function renderAdmin(){
+  const db = loadDB();
+  const matched = matchPrePost(db);
+
+  return `
+  <div class="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+    <!-- 헤더 -->
+    <div class="bg-gradient-to-r from-slate-800 to-slate-700 text-white p-5 flex items-center justify-between">
+      <div>
+        <h2 class="text-xl font-bold flex items-center gap-2">🔧 관리자 페이지</h2>
+        <p class="text-xs text-slate-300 mt-1">사전 ${db.pre.length}건 · 사후 ${db.post.length}건 · 매칭 ${matched.length}쌍</p>
+      </div>
+      <div class="flex gap-2 flex-wrap">
+        <button id="btnRefresh" onclick="refreshAdmin()" class="bg-slate-600 hover:bg-slate-500 px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-1">🔄 새로고침</button>
+        <button onclick="downloadExcel()" class="bg-emerald-500 hover:bg-emerald-600 px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-1">📊 엑셀</button>
+        <button onclick="downloadPDF()" class="bg-rose-500 hover:bg-rose-600 px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-1">📄 PDF 보고서</button>
+      </div>
+    </div>
+
+    <!-- 탭 -->
+    <div class="border-b border-slate-200 px-3 flex gap-1 overflow-x-auto">
+      ${['overview','pre','post','compare','danger'].map(t=>{
+        const labels = {overview:'📈 통합 현황', pre:'📝 사전 데이터', post:'✅ 사후 데이터', compare:'🔬 사전·사후 비교', danger:'⚠️ 데이터 관리'};
+        const active = adminTab===t ? 'tab-active' : 'text-slate-500 hover:text-slate-700';
+        return `<button onclick="setAdminTab('${t}')" class="px-4 py-3 text-sm whitespace-nowrap ${active}">${labels[t]}</button>`;
+      }).join('')}
+    </div>
+
+    <div class="p-5">
+      ${adminTab==='overview' ? renderAdminOverview(db, matched) : ''}
+      ${adminTab==='pre' ? renderAdminTable(db.pre, 'pre') : ''}
+      ${adminTab==='post' ? renderAdminTable(db.post, 'post') : ''}
+      ${adminTab==='compare' ? renderAdminCompare(matched) : ''}
+      ${adminTab==='danger' ? renderAdminDanger() : ''}
+    </div>
+
+    <button onclick="go('home')" class="block w-full text-center text-sm text-slate-500 hover:text-slate-700 py-3 border-t border-slate-200">← 사용자 화면으로</button>
+  </div>
+  `;
+}
+
+/* ====== 사전·사후 매칭 (유치원명 + 아동명 기준) ====== */
+function matchPrePost(db){
+  const matched = [];
+  db.pre.forEach(p=>{
+    const post = db.post.find(po =>
+      po.kindergarten === p.kindergarten && po.childName === p.childName);
+    if(post) matched.push({pre:p, post:post});
+  });
+  return matched;
+}
+
+/* ====== 관리자 - 통합 현황 ====== */
+function renderAdminOverview(db, matched){
+  return `
+  <div class="grid sm:grid-cols-4 gap-3 mb-6">
+    <div class="bg-teal-50 border border-teal-200 rounded-xl p-4 text-center">
+      <p class="text-xs text-teal-600 font-medium">사전 응답</p>
+      <p class="text-3xl font-bold text-teal-800 mt-1">${db.pre.length}</p>
+    </div>
+    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
+      <p class="text-xs text-amber-600 font-medium">사후 응답</p>
+      <p class="text-3xl font-bold text-amber-800 mt-1">${db.post.length}</p>
+    </div>
+    <div class="bg-violet-50 border border-violet-200 rounded-xl p-4 text-center">
+      <p class="text-xs text-violet-600 font-medium">사전·사후 매칭</p>
+      <p class="text-3xl font-bold text-violet-800 mt-1">${matched.length}쌍</p>
+    </div>
+    <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 text-center">
+      <p class="text-xs text-slate-600 font-medium">총 응답자</p>
+      <p class="text-3xl font-bold text-slate-800 mt-1">${db.pre.length + db.post.length}</p>
+    </div>
+  </div>
+
+  <div class="grid lg:grid-cols-2 gap-4">
+    <div class="bg-white border border-slate-200 rounded-xl p-4">
+      <h4 class="font-bold text-slate-700 mb-3">하루 평균 칫솔질 횟수 (사전 vs 사후)</h4>
+      <canvas id="chart_brushing" height="200"></canvas>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-xl p-4">
+      <h4 class="font-bold text-slate-700 mb-3">불소 인지도 (사전 vs 사후)</h4>
+      <canvas id="chart_fluoride" height="200"></canvas>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-xl p-4">
+      <h4 class="font-bold text-slate-700 mb-3">스스로 칫솔질 비율 (사전 vs 사후)</h4>
+      <canvas id="chart_self" height="200"></canvas>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-xl p-4">
+      <h4 class="font-bold text-slate-700 mb-3">프로그램 만족도 (사후)</h4>
+      <canvas id="chart_satis" height="200"></canvas>
+    </div>
+  </div>
+  `;
+}
+
+/* ====== 관리자 - 데이터 표 ====== */
+function renderAdminTable(records, type){
+  if(records.length === 0){
+    return `<div class="text-center py-12 text-slate-400">
+      <p class="text-5xl mb-3">📭</p><p>아직 응답 데이터가 없습니다.</p>
+    </div>`;
+  }
+  const isPre = type === 'pre';
+  const questions = isPre ? COMMON_Q : [...COMMON_Q, ...POST_EXTRA_Q];
+  return `
+  <div class="overflow-x-auto">
+    <table class="w-full text-xs border-collapse">
+      <thead>
+        <tr class="bg-slate-100">
+          <th class="px-2 py-2 border border-slate-200">No</th>
+          <th class="px-2 py-2 border border-slate-200">제출일시</th>
+          <th class="px-2 py-2 border border-slate-200">유치원</th>
+          <th class="px-2 py-2 border border-slate-200">아동</th>
+          <th class="px-2 py-2 border border-slate-200">성별/연령</th>
+          <th class="px-2 py-2 border border-slate-200">양육자(관계)</th>
+          ${questions.map(q=>`<th class="px-2 py-2 border border-slate-200">${q.id.toUpperCase()}</th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>
+        ${records.map((r,i)=>`
+          <tr class="hover:bg-slate-50">
+            <td class="px-2 py-1.5 border border-slate-200 text-center">${i+1}</td>
+            <td class="px-2 py-1.5 border border-slate-200 text-center whitespace-nowrap">${formatDate(r.submittedAt)}</td>
+            <td class="px-2 py-1.5 border border-slate-200">${r.kindergarten}</td>
+            <td class="px-2 py-1.5 border border-slate-200">${r.childName}</td>
+            <td class="px-2 py-1.5 border border-slate-200 text-center">${r.gender}/${r.age}</td>
+            <td class="px-2 py-1.5 border border-slate-200">${r.guardianName}(${r.relation})</td>
+            ${questions.map(q=>`<td class="px-2 py-1.5 border border-slate-200">${formatAnswer(r[q.id], q)}</td>`).join('')}
+          </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>
+  <p class="text-xs text-slate-500 mt-3">※ 전체 데이터는 [엑셀 다운로드] 버튼으로 받아보실 수 있습니다.</p>
+  `;
+}
+function formatAnswer(v, q){
+  if(v == null || v === '') return '<span class="text-slate-300">-</span>';
+  if(Array.isArray(v)) return v.join(', ');
+  if(q.type === 'radio') return `${v}. ${q.options[v-1] ?? ''}`;
+  return v;
+}
+function formatDate(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+/* ====== 관리자 - 비교 분석 ====== */
+function renderAdminCompare(matched){
+  if(matched.length === 0){
+    return `<div class="text-center py-12 text-slate-400">
+      <p class="text-5xl mb-3">🔍</p><p>매칭된 사전·사후 쌍이 없습니다.</p>
+      <p class="text-xs mt-2">유치원명·아동명이 동일해야 자동 매칭됩니다.</p>
+    </div>`;
+  }
+  return `
+  <div class="overflow-x-auto">
+    <table class="w-full text-xs border-collapse">
+      <thead class="bg-violet-50">
+        <tr>
+          <th class="px-2 py-2 border border-slate-200">유치원</th>
+          <th class="px-2 py-2 border border-slate-200">아동</th>
+          <th class="px-2 py-2 border border-slate-200">칫솔질 횟수<br>(사전→사후)</th>
+          <th class="px-2 py-2 border border-slate-200">간식 횟수<br>(사전→사후)</th>
+          <th class="px-2 py-2 border border-slate-200">스스로 칫솔질<br>(사전→사후)</th>
+          <th class="px-2 py-2 border border-slate-200">마무리 양치<br>(사전→사후)</th>
+          <th class="px-2 py-2 border border-slate-200">불소 인지도<br>(사전→사후)</th>
+          <th class="px-2 py-2 border border-slate-200">만족도</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${matched.map(m=>{
+          const arrow = (a,b)=> {
+            if(a==null||b==null) return '-';
+            if(b>a) return `<span class="text-emerald-600 font-semibold">${a}→${b} ↑</span>`;
+            if(b<a) return `<span class="text-rose-600 font-semibold">${a}→${b} ↓</span>`;
+            return `<span class="text-slate-500">${a}→${b} =</span>`;
+          };
+          // 의식 향상은 q3,q6,q8에서 작은 값(1)이 좋음 → 역방향
+          const arrowReverse = (a,b)=>{
+            if(a==null||b==null) return '-';
+            if(b<a) return `<span class="text-emerald-600 font-semibold">${a}→${b} ↑</span>`;
+            if(b>a) return `<span class="text-rose-600 font-semibold">${a}→${b} ↓</span>`;
+            return `<span class="text-slate-500">${a}→${b} =</span>`;
+          };
+          const satis = m.post.q9 ? `${m.post.q9}. ${POST_EXTRA_Q[0].options[m.post.q9-1]}` : '-';
+          return `
+          <tr class="hover:bg-slate-50">
+            <td class="px-2 py-1.5 border border-slate-200">${m.pre.kindergarten}</td>
+            <td class="px-2 py-1.5 border border-slate-200">${m.pre.childName}</td>
+            <td class="px-2 py-1.5 border border-slate-200 text-center">${arrow(m.pre.q2, m.post.q2)}</td>
+            <td class="px-2 py-1.5 border border-slate-200 text-center">${arrowReverse(m.pre.q7a, m.post.q7a)}</td>
+            <td class="px-2 py-1.5 border border-slate-200 text-center">${arrowReverse(m.pre.q3, m.post.q3)}</td>
+            <td class="px-2 py-1.5 border border-slate-200 text-center">${arrowReverse(m.pre.q6, m.post.q6)}</td>
+            <td class="px-2 py-1.5 border border-slate-200 text-center">${arrowReverse(m.pre.q8, m.post.q8)}</td>
+            <td class="px-2 py-1.5 border border-slate-200 text-center text-xs">${satis}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>
+  <p class="text-xs text-slate-500 mt-3">※ 표시 의미: <span class="text-emerald-600">↑ 개선</span>, <span class="text-rose-600">↓ 후퇴</span>, <span class="text-slate-500">= 동일</span>. 행동 빈도(칫솔질 횟수)는 증가가 개선, 보조 행동(스스로 칫솔질·인지도 등)은 더 적은 번호로 이동이 개선입니다.</p>
+  `;
+}
+
+/* ====== 관리자 - 데이터 관리 ====== */
+function renderAdminDanger(){
+  return `
+  <div class="space-y-4">
+    <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+      <h4 class="font-bold text-emerald-800 mb-2">☁️ 데이터 저장 위치</h4>
+      <p class="text-xs text-slate-600 mb-2">응답 데이터는 <b>Supabase 클라우드</b>에 저장됩니다. 어떤 디바이스에서 접속해도 동일한 데이터를 볼 수 있습니다.</p>
+      <p class="text-xs text-slate-500">URL: <code class="bg-white px-1.5 py-0.5 rounded">${SUPABASE_URL}</code></p>
+    </div>
+    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+      <h4 class="font-bold text-amber-800 mb-2">📦 데이터 백업 (JSON)</h4>
+      <p class="text-xs text-slate-600 mb-3">현재 시점의 전체 응답 데이터를 JSON 파일로 백업합니다.</p>
+      <button onclick="downloadJSON()" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">JSON 백업 다운로드</button>
+    </div>
+    <div class="bg-rose-50 border border-rose-200 rounded-xl p-4">
+      <h4 class="font-bold text-rose-800 mb-2">🗑️ 전체 데이터 삭제 (Supabase)</h4>
+      <p class="text-xs text-slate-600 mb-3">Supabase의 모든 사전·사후 응답 데이터가 삭제됩니다. 이 작업은 되돌릴 수 없습니다.</p>
+      <p class="text-xs text-rose-600 mb-3">※ DELETE 정책이 RLS에 활성화되어 있어야 합니다. (스키마 SQL 하단 주석 참조)</p>
+      <button onclick="clearAllData()" class="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">전체 데이터 삭제</button>
+    </div>
+    <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-600 leading-relaxed">
+      <p>💡 <b>안내:</b></p>
+      <p class="mt-1">• 학부모님들은 각자 자신의 디바이스(휴대폰·PC)에서 사전/사후 설문에 응답할 수 있습니다.</p>
+      <p class="mt-1">• 사전·사후 매칭은 <b>유치원명 + 아동성명</b>이 동일한 경우 자동으로 이루어집니다.</p>
+      <p class="mt-1">• 중요한 분석 시점에는 <b>주기적으로 엑셀로 백업</b>을 받아두시길 권장합니다.</p>
+    </div>
+  </div>
+  `;
+}
+
+/* ====== 차트 그리기 ====== */
+let charts = {};
+function drawAdminCharts(){
+  if(adminTab !== 'overview') return;
+  Object.values(charts).forEach(c=>c?.destroy());
+  charts = {};
+  const db = loadDB();
+
+  // 1) 칫솔질 횟수 평균
+  const avg = arr => arr.length ? (arr.reduce((a,b)=>a+(+b||0),0)/arr.length).toFixed(2) : 0;
+  const preBrush = avg(db.pre.map(r=>r.q2));
+  const postBrush = avg(db.post.map(r=>r.q2));
+  charts.brushing = new Chart(document.getElementById('chart_brushing'), {
+    type:'bar',
+    data:{labels:['사전','사후'], datasets:[{label:'평균 칫솔질 횟수(회/일)', data:[preBrush, postBrush], backgroundColor:['#14b8a6','#f59e0b']}]},
+    options:{plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}
+  });
+
+  // 2) 불소 인지도 (q8) - 분포
+  const q8Counts = (records) => {
+    const c = [0,0,0,0];
+    records.forEach(r=>{ if(r.q8>=1 && r.q8<=4) c[r.q8-1]++; });
+    return c;
+  };
+  charts.fluoride = new Chart(document.getElementById('chart_fluoride'), {
+    type:'bar',
+    data:{
+      labels:['잘 이해','대략 안다','이름만','전혀 모름'],
+      datasets:[
+        {label:'사전', data:q8Counts(db.pre), backgroundColor:'#14b8a6'},
+        {label:'사후', data:q8Counts(db.post), backgroundColor:'#f59e0b'},
+      ]
+    },
+    options:{scales:{y:{beginAtZero:true, ticks:{stepSize:1}}}}
+  });
+
+  // 3) 스스로 칫솔질 (q3) - 분포
+  const q3Counts = (records) => {
+    const c = [0,0,0];
+    records.forEach(r=>{ if(r.q3>=1 && r.q3<=3) c[r.q3-1]++; });
+    return c;
+  };
+  charts.self = new Chart(document.getElementById('chart_self'), {
+    type:'bar',
+    data:{
+      labels:['끝까지 스스로','대부분 스스로','부모가 닦아줌'],
+      datasets:[
+        {label:'사전', data:q3Counts(db.pre), backgroundColor:'#14b8a6'},
+        {label:'사후', data:q3Counts(db.post), backgroundColor:'#f59e0b'},
+      ]
+    },
+    options:{scales:{y:{beginAtZero:true, ticks:{stepSize:1}}}}
+  });
+
+  // 4) 만족도 (q9) - 사후만
+  const q9Counts = [0,0,0,0];
+  db.post.forEach(r=>{ if(r.q9>=1 && r.q9<=4) q9Counts[r.q9-1]++; });
+  charts.satis = new Chart(document.getElementById('chart_satis'), {
+    type:'doughnut',
+    data:{labels:['매우 그렇다','다소 그렇다','보통이다','그렇지 않다'], datasets:[{data:q9Counts, backgroundColor:['#10b981','#14b8a6','#f59e0b','#f43f5e']}]},
+    options:{plugins:{legend:{position:'bottom', labels:{font:{size:11}}}}}
+  });
+}
+
+/* ====== 엑셀 다운로드 (다중 시트) ====== */
+function downloadExcel(){
+  const db = loadDB();
+  const matched = matchPrePost(db);
+  const wb = XLSX.utils.book_new();
+
+  // 시트1: 사전 데이터
+  const preRows = db.pre.map((r,i)=>buildExcelRow(r, COMMON_Q, i+1));
+  if(preRows.length){
+    const ws = XLSX.utils.json_to_sheet(preRows);
+    XLSX.utils.book_append_sheet(wb, ws, '1.사전 데이터');
+  } else {
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['응답 없음']]), '1.사전 데이터');
+  }
+
+  // 시트2: 사후 데이터
+  const postRows = db.post.map((r,i)=>buildExcelRow(r, [...COMMON_Q,...POST_EXTRA_Q], i+1));
+  if(postRows.length){
+    const ws = XLSX.utils.json_to_sheet(postRows);
+    XLSX.utils.book_append_sheet(wb, ws, '2.사후 데이터');
+  } else {
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['응답 없음']]), '2.사후 데이터');
+  }
+
+  // 시트3: 사전·사후 비교 분석
+  if(matched.length){
+    const cmpRows = matched.map((m,i)=>({
+      'No': i+1,
+      '유치원': m.pre.kindergarten,
+      '아동': m.pre.childName,
+      '성별': m.pre.gender,
+      '연령': m.pre.age,
+      '[Q2]칫솔질 횟수(사전)': m.pre.q2,
+      '[Q2]칫솔질 횟수(사후)': m.post.q2,
+      '[Q2]변화': numDelta(m.pre.q2, m.post.q2),
+      '[Q3]스스로(사전)': labelOf(COMMON_Q[2], m.pre.q3),
+      '[Q3]스스로(사후)': labelOf(COMMON_Q[2], m.post.q3),
+      '[Q4]방법(사전)': labelOf(COMMON_Q[3], m.pre.q4),
+      '[Q4]방법(사후)': labelOf(COMMON_Q[3], m.post.q4),
+      '[Q6]마무리양치(사전)': labelOf(COMMON_Q[5], m.pre.q6),
+      '[Q6]마무리양치(사후)': labelOf(COMMON_Q[5], m.post.q6),
+      '[Q7a]간식 횟수(사전)': m.pre.q7a,
+      '[Q7a]간식 횟수(사후)': m.post.q7a,
+      '[Q7a]변화': numDelta(m.pre.q7a, m.post.q7a),
+      '[Q8]불소인지(사전)': labelOf(COMMON_Q[7], m.pre.q8),
+      '[Q8]불소인지(사후)': labelOf(COMMON_Q[7], m.post.q8),
+      '[Q9]만족도': labelOf(POST_EXTRA_Q[0], m.post.q9),
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cmpRows), '3.사전·사후 비교');
+  } else {
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['매칭된 응답 없음']]), '3.사전·사후 비교');
+  }
+
+  // 시트4: 통계 요약
+  const stats = buildStats(db, matched);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(stats), '4.통계 요약');
+
+  // 시트5: 시각화용 (피벗 데이터)
+  const viz = buildVizData(db);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(viz), '5.시각화 데이터');
+
+  const fname = `유아구강보건교육_설문결과_${new Date().toISOString().slice(0,10)}.xlsx`;
+  XLSX.writeFile(wb, fname);
+}
+
+function buildExcelRow(r, questions, no){
+  const row = {
+    'No': no,
+    '제출일시': formatDate(r.submittedAt),
+    '유치원명': r.kindergarten,
+    '아동성명': r.childName,
+    '아동성별': r.gender,
+    '아동연령': r.age,
+    '주양육자': r.guardianName,
+    '관계': r.relation,
+  };
+  questions.forEach(q=>{
+    let v = r[q.id];
+    if(Array.isArray(v)) v = v.join(', ');
+    else if(q.type==='radio' && v) v = `${v}. ${q.options[v-1]}`;
+    row[q.id.toUpperCase()+'. '+q.label.replace(/^\d+\.\s*/,'').slice(0,30)] = v ?? '';
+    if(q.allowEtc && r[q.id+'_etc']) row[q.id.toUpperCase()+'_기타'] = r[q.id+'_etc'];
+  });
+  return row;
+}
+function labelOf(q, v){ if(v==null) return ''; return q.options[v-1] ? `${v}. ${q.options[v-1]}` : v; }
+function numDelta(a,b){ if(a==null||b==null) return ''; const d=b-a; return d>0?`+${d}`:String(d); }
+
+function buildStats(db, matched){
+  const avg = arr => arr.length ? (arr.reduce((a,b)=>a+(+b||0),0)/arr.length).toFixed(2) : '-';
+  const distQ = (records, qid, opts) => opts.map((o,i)=> records.filter(r=>r[qid]===i+1).length );
+  const rows = [
+    ['통계 요약 보고서','','','',''],
+    ['', '', '', '', ''],
+    ['생성일', new Date().toLocaleString('ko-KR')],
+    ['', ''],
+    ['1. 응답 현황'],
+    ['항목','건수'],
+    ['사전 응답', db.pre.length],
+    ['사후 응답', db.post.length],
+    ['사전·사후 매칭', matched.length],
+    ['', ''],
+    ['2. 행동 평균치 비교'],
+    ['항목','사전','사후'],
+    ['하루 평균 칫솔질 횟수(회)', avg(db.pre.map(r=>r.q2)), avg(db.post.map(r=>r.q2))],
+    ['하루 평균 간식 횟수(회)', avg(db.pre.map(r=>r.q7a)), avg(db.post.map(r=>r.q7a))],
+    ['', ''],
+    ['3. [Q3] 스스로 칫솔질 분포'],
+    ['선택지','사전','사후'],
+    ...COMMON_Q[2].options.map((o,i)=>[`${i+1}. ${o}`, db.pre.filter(r=>r.q3===i+1).length, db.post.filter(r=>r.q3===i+1).length]),
+    ['', ''],
+    ['4. [Q6] 마무리 양치 분포'],
+    ['선택지','사전','사후'],
+    ...COMMON_Q[5].options.map((o,i)=>[`${i+1}. ${o}`, db.pre.filter(r=>r.q6===i+1).length, db.post.filter(r=>r.q6===i+1).length]),
+    ['', ''],
+    ['5. [Q8] 불소 인지도 분포'],
+    ['선택지','사전','사후'],
+    ...COMMON_Q[7].options.map((o,i)=>[`${i+1}. ${o}`, db.pre.filter(r=>r.q8===i+1).length, db.post.filter(r=>r.q8===i+1).length]),
+    ['', ''],
+    ['6. [Q9] 프로그램 만족도 (사후)'],
+    ['선택지','건수'],
+    ...POST_EXTRA_Q[0].options.map((o,i)=>[`${i+1}. ${o}`, db.post.filter(r=>r.q9===i+1).length]),
+  ];
+  return rows;
+}
+
+function buildVizData(db){
+  // 차트로 활용 가능한 형태의 단순 표
+  const distQ = (records, qid, n) => Array.from({length:n}, (_,i)=> records.filter(r=>r[qid]===i+1).length);
+  const rows = [
+    ['시각화용 데이터 (엑셀에서 차트 그리기용)'],
+    ['', ''],
+    ['# 칫솔질 횟수 평균'],
+    ['시점','평균(회/일)'],
+    ['사전', db.pre.length ? (db.pre.reduce((a,b)=>a+(+b.q2||0),0)/db.pre.length).toFixed(2):0],
+    ['사후', db.post.length ? (db.post.reduce((a,b)=>a+(+b.q2||0),0)/db.post.length).toFixed(2):0],
+    ['', ''],
+    ['# 불소 인지도(Q8) 분포'],
+    ['선택지','사전','사후'],
+    ...COMMON_Q[7].options.map((o,i)=>[o, db.pre.filter(r=>r.q8===i+1).length, db.post.filter(r=>r.q8===i+1).length]),
+    ['', ''],
+    ['# 스스로 칫솔질(Q3) 분포'],
+    ['선택지','사전','사후'],
+    ...COMMON_Q[2].options.map((o,i)=>[o, db.pre.filter(r=>r.q3===i+1).length, db.post.filter(r=>r.q3===i+1).length]),
+    ['', ''],
+    ['# 만족도(Q9) - 사후'],
+    ['선택지','건수'],
+    ...POST_EXTRA_Q[0].options.map((o,i)=>[o, db.post.filter(r=>r.q9===i+1).length]),
+  ];
+  return rows;
+}
+
+/* ====== PDF 보고서 다운로드 (html2canvas + jsPDF) ====== */
+async function downloadPDF(){
+  // 임시 보고서 DOM 생성
+  const db = loadDB();
+  const matched = matchPrePost(db);
+  const reportEl = document.createElement('div');
+  reportEl.id = 'pdfReport';
+  reportEl.style.cssText = 'position:fixed; left:-99999px; top:0; background:white; width:794px; padding:40px; font-family:Pretendard, sans-serif;';
+  reportEl.innerHTML = buildPdfHtml(db, matched);
+  document.body.appendChild(reportEl);
+  // 폰트 로딩 대기 후 차트 그리기
+  await new Promise(r=>setTimeout(r,100));
+  if(document.fonts && document.fonts.ready) await document.fonts.ready;
+  drawPdfCharts(db);
+  await new Promise(r=>setTimeout(r,800));
+
+  const canvas = await html2canvas(reportEl, {scale:2, useCORS:true, backgroundColor:'#ffffff'});
+  const imgData = canvas.toDataURL('image/jpeg', 0.92);
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('p','mm','a4');
+  const pdfW = 210, pdfH = 297;
+  const imgW = pdfW;
+  const imgH = canvas.height * imgW / canvas.width;
+  let heightLeft = imgH;
+  let position = 0;
+  pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH);
+  heightLeft -= pdfH;
+  while(heightLeft > 0){
+    position = heightLeft - imgH;
+    pdf.addPage();
+    pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH);
+    heightLeft -= pdfH;
+  }
+  pdf.save(`유아구강보건교육_보고서_${new Date().toISOString().slice(0,10)}.pdf`);
+  reportEl.remove();
+}
+
+function buildPdfHtml(db, matched){
+  const today = new Date().toLocaleDateString('ko-KR');
+  const avg = arr => arr.length ? (arr.reduce((a,b)=>a+(+b||0),0)/arr.length).toFixed(2) : '-';
+  const distRow = (q, qid)=> q.options.map((o,i)=>{
+    const pre = db.pre.filter(r=>r[qid]===i+1).length;
+    const post = db.post.filter(r=>r[qid]===i+1).length;
+    return `<tr><td style="padding:6px;border:1px solid #e2e8f0">${i+1}. ${o}</td><td style="padding:6px;border:1px solid #e2e8f0;text-align:center">${pre}</td><td style="padding:6px;border:1px solid #e2e8f0;text-align:center">${post}</td></tr>`;
+  }).join('');
+
+  return `
+  <div style="border-bottom:3px solid #0d9488; padding-bottom:14px; margin-bottom:24px;">
+    <h1 style="font-size:24px; color:#0f766e; margin:0; font-weight:bold;">🦷 유아 구강보건교육 효과 모니터링 보고서</h1>
+    <p style="color:#64748b; font-size:13px; margin:6px 0 0 0;">2026년 동구보건소 × 울산과학대학교 치위생학과 | 작성일: ${today}</p>
+  </div>
+
+  <h2 style="color:#0f766e; font-size:17px; margin:18px 0 10px 0;">1. 응답 현황</h2>
+  <table style="width:100%; border-collapse:collapse; font-size:13px;">
+    <thead><tr style="background:#f0fdfa;">
+      <th style="padding:8px;border:1px solid #99f6e4">사전 응답</th>
+      <th style="padding:8px;border:1px solid #99f6e4">사후 응답</th>
+      <th style="padding:8px;border:1px solid #99f6e4">사전·사후 매칭</th>
+    </tr></thead>
+    <tbody><tr>
+      <td style="padding:10px;border:1px solid #99f6e4;text-align:center;font-size:18px;font-weight:bold;color:#0f766e">${db.pre.length}건</td>
+      <td style="padding:10px;border:1px solid #99f6e4;text-align:center;font-size:18px;font-weight:bold;color:#b45309">${db.post.length}건</td>
+      <td style="padding:10px;border:1px solid #99f6e4;text-align:center;font-size:18px;font-weight:bold;color:#7c3aed">${matched.length}쌍</td>
+    </tr></tbody>
+  </table>
+
+  <h2 style="color:#0f766e; font-size:17px; margin:24px 0 10px 0;">2. 핵심 지표 변화 (사전 → 사후)</h2>
+  <table style="width:100%; border-collapse:collapse; font-size:13px;">
+    <thead><tr style="background:#f0fdfa;">
+      <th style="padding:8px;border:1px solid #99f6e4;text-align:left">항목</th>
+      <th style="padding:8px;border:1px solid #99f6e4">사전 평균</th>
+      <th style="padding:8px;border:1px solid #99f6e4">사후 평균</th>
+      <th style="padding:8px;border:1px solid #99f6e4">변화</th>
+    </tr></thead>
+    <tbody>
+      <tr><td style="padding:8px;border:1px solid #e2e8f0">하루 평균 칫솔질 횟수 (회)</td>
+        <td style="padding:8px;border:1px solid #e2e8f0;text-align:center">${avg(db.pre.map(r=>r.q2))}</td>
+        <td style="padding:8px;border:1px solid #e2e8f0;text-align:center">${avg(db.post.map(r=>r.q2))}</td>
+        <td style="padding:8px;border:1px solid #e2e8f0;text-align:center">${diffStr(avg(db.pre.map(r=>r.q2)), avg(db.post.map(r=>r.q2)))}</td>
+      </tr>
+      <tr><td style="padding:8px;border:1px solid #e2e8f0">하루 평균 간식 횟수 (회)</td>
+        <td style="padding:8px;border:1px solid #e2e8f0;text-align:center">${avg(db.pre.map(r=>r.q7a))}</td>
+        <td style="padding:8px;border:1px solid #e2e8f0;text-align:center">${avg(db.post.map(r=>r.q7a))}</td>
+        <td style="padding:8px;border:1px solid #e2e8f0;text-align:center">${diffStr(avg(db.pre.map(r=>r.q7a)), avg(db.post.map(r=>r.q7a)), true)}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 style="color:#0f766e; font-size:17px; margin:24px 0 10px 0;">3. 시각화 차트</h2>
+  <div style="display:flex; gap:12px;">
+    <div style="flex:1; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
+      <p style="font-size:12px; font-weight:bold; margin:0 0 8px 0;">불소 인지도 (사전 vs 사후)</p>
+      <canvas id="pdf_chart_q8" width="350" height="200"></canvas>
+    </div>
+    <div style="flex:1; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
+      <p style="font-size:12px; font-weight:bold; margin:0 0 8px 0;">스스로 칫솔질 (사전 vs 사후)</p>
+      <canvas id="pdf_chart_q3" width="350" height="200"></canvas>
+    </div>
+  </div>
+  <div style="display:flex; gap:12px; margin-top:12px;">
+    <div style="flex:1; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
+      <p style="font-size:12px; font-weight:bold; margin:0 0 8px 0;">마무리 양치 (사전 vs 사후)</p>
+      <canvas id="pdf_chart_q6" width="350" height="200"></canvas>
+    </div>
+    <div style="flex:1; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
+      <p style="font-size:12px; font-weight:bold; margin:0 0 8px 0;">프로그램 만족도</p>
+      <canvas id="pdf_chart_q9" width="350" height="200"></canvas>
+    </div>
+  </div>
+
+  <h2 style="color:#0f766e; font-size:17px; margin:24px 0 10px 0;">4. 불소 인지도 (Q8) 응답 분포</h2>
+  <table style="width:100%; border-collapse:collapse; font-size:13px;">
+    <thead><tr style="background:#f0fdfa;">
+      <th style="padding:8px;border:1px solid #99f6e4;text-align:left">선택지</th>
+      <th style="padding:8px;border:1px solid #99f6e4;width:80px">사전</th>
+      <th style="padding:8px;border:1px solid #99f6e4;width:80px">사후</th>
+    </tr></thead>
+    <tbody>${distRow(COMMON_Q[7],'q8')}</tbody>
+  </table>
+
+  <h2 style="color:#0f766e; font-size:17px; margin:24px 0 10px 0;">5. 마무리 양치 (Q6) 응답 분포</h2>
+  <table style="width:100%; border-collapse:collapse; font-size:13px;">
+    <thead><tr style="background:#f0fdfa;">
+      <th style="padding:8px;border:1px solid #99f6e4;text-align:left">선택지</th>
+      <th style="padding:8px;border:1px solid #99f6e4;width:80px">사전</th>
+      <th style="padding:8px;border:1px solid #99f6e4;width:80px">사후</th>
+    </tr></thead>
+    <tbody>${distRow(COMMON_Q[5],'q6')}</tbody>
+  </table>
+
+  <h2 style="color:#0f766e; font-size:17px; margin:24px 0 10px 0;">6. 종합 의견</h2>
+  <div style="background:#f8fafc; border-left:4px solid #0d9488; padding:14px; font-size:13px; line-height:1.6;">
+    <p style="margin:0;">${buildSummary(db, matched)}</p>
+  </div>
+
+  <p style="text-align:center; color:#94a3b8; font-size:11px; margin-top:30px; border-top:1px solid #e2e8f0; padding-top:14px;">
+    동구보건소 × 울산과학대학교 치위생학과 · 문의: 유진실 교수 (010-2494-3875 / jsyu@uc.ac.kr)
+  </p>
+  `;
+}
+
+function diffStr(a,b,reverse=false){
+  const av = parseFloat(a), bv = parseFloat(b);
+  if(isNaN(av)||isNaN(bv)) return '-';
+  const d = (bv-av).toFixed(2);
+  if(d == 0) return `<span style="color:#64748b">±0</span>`;
+  const positive = d > 0;
+  const isImproved = reverse ? !positive : positive;
+  const color = isImproved ? '#059669' : '#dc2626';
+  const arrow = positive ? '↑' : '↓';
+  return `<span style="color:${color};font-weight:bold">${positive?'+':''}${d} ${arrow}</span>`;
+}
+
+function buildSummary(db, matched){
+  if(db.pre.length===0 && db.post.length===0) return '아직 수집된 응답이 없습니다.';
+  const avgPre = db.pre.length ? (db.pre.reduce((a,b)=>a+(+b.q2||0),0)/db.pre.length) : 0;
+  const avgPost = db.post.length ? (db.post.reduce((a,b)=>a+(+b.q2||0),0)/db.post.length) : 0;
+  const fluPre1 = db.pre.filter(r=>r.q8===1||r.q8===2).length;
+  const fluPost1 = db.post.filter(r=>r.q8===1||r.q8===2).length;
+  const flu = (cnt, total)=> total ? Math.round(cnt/total*100) : 0;
+  const satisGood = db.post.filter(r=>r.q9===1||r.q9===2).length;
+  const satisRate = db.post.length ? Math.round(satisGood/db.post.length*100) : 0;
+
+  return `
+    본 보고서는 사전 ${db.pre.length}건, 사후 ${db.post.length}건의 응답을 바탕으로 작성되었습니다.
+    하루 평균 칫솔질 횟수는 사전 ${avgPre.toFixed(2)}회에서 사후 ${avgPost.toFixed(2)}회로 변화하였으며,
+    불소 역할에 대해 '잘 이해' 또는 '대략 안다'고 응답한 비율은 사전 ${flu(fluPre1, db.pre.length)}%에서 사후 ${flu(fluPost1, db.post.length)}%로 나타났습니다.
+    프로그램에 '매우 그렇다·다소 그렇다'로 만족한 비율은 ${satisRate}%입니다.
+    매칭된 ${matched.length}쌍을 통해 개별 행동 변화를 추적할 수 있으며, 추가 분석은 첨부 엑셀 파일을 참고해 주시기 바랍니다.
+  `;
+}
+
+function drawPdfCharts(db){
+  const distQ = (records, qid, n) => Array.from({length:n}, (_,i)=> records.filter(r=>r[qid]===i+1).length);
+  const opts = {responsive:false, animation:false, plugins:{legend:{labels:{font:{size:10}}}}, scales:{y:{beginAtZero:true, ticks:{stepSize:1, font:{size:9}}}, x:{ticks:{font:{size:9}}}}};
+  new Chart(document.getElementById('pdf_chart_q8'), {
+    type:'bar',
+    data:{labels:['잘 이해','대략 안다','이름만','전혀 모름'],
+      datasets:[{label:'사전', data:distQ(db.pre,'q8',4), backgroundColor:'#14b8a6'},
+                {label:'사후', data:distQ(db.post,'q8',4), backgroundColor:'#f59e0b'}]},
+    options:opts
+  });
+  new Chart(document.getElementById('pdf_chart_q3'), {
+    type:'bar',
+    data:{labels:[['끝까지','스스로'],['대부분','스스로'],['부모가','닦아줌']],
+      datasets:[{label:'사전', data:distQ(db.pre,'q3',3), backgroundColor:'#14b8a6'},
+                {label:'사후', data:distQ(db.post,'q3',3), backgroundColor:'#f59e0b'}]},
+    options:opts
+  });
+  new Chart(document.getElementById('pdf_chart_q6'), {
+    type:'bar',
+    data:{labels:['매번 마무리','가끔 마무리','확인만','확인안함'],
+      datasets:[{label:'사전', data:distQ(db.pre,'q6',4), backgroundColor:'#14b8a6'},
+                {label:'사후', data:distQ(db.post,'q6',4), backgroundColor:'#f59e0b'}]},
+    options:opts
+  });
+  new Chart(document.getElementById('pdf_chart_q9'), {
+    type:'doughnut',
+    data:{labels:['매우 그렇다','다소 그렇다','보통이다','그렇지 않다'],
+      datasets:[{data:distQ(db.post,'q9',4), backgroundColor:['#10b981','#14b8a6','#f59e0b','#f43f5e']}]},
+    options:{responsive:false, animation:false, plugins:{legend:{position:'bottom', labels:{font:{size:10}}}}}
+  });
+}
+
+/* ====== JSON 백업/삭제 ====== */
+function downloadJSON(){
+  const db = loadDB();
+  const blob = new Blob([JSON.stringify(db, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `구강보건교육_백업_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+async function clearAllData(){
+  const confirm1 = prompt("정말로 Supabase의 모든 응답 데이터를 삭제하시려면 '삭제확인' 이라고 입력하세요.");
+  if(confirm1 !== '삭제확인') return;
+  try {
+    const [{error: e1}, {error: e2}] = await Promise.all([
+      sb.from('pre_surveys').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+      sb.from('post_surveys').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+    ]);
+    if(e1) throw e1; if(e2) throw e2;
+    await fetchDB();
+    alert('전체 데이터가 삭제되었습니다.');
+    render();
+  } catch(err) {
+    alert('삭제 실패: ' + (err?.message || err) + '\n\n※ Supabase RLS의 DELETE 정책이 비활성화되어 있을 수 있습니다.\nSQL 스키마 파일 하단의 주석을 해제 후 재실행해 주세요.');
+  }
+}
+
+/* ====== 초기 실행 ====== */
+(async function init(){
+  // 즉시 캐시 표시 → 백그라운드에서 fetch
+  try {
+    const c = JSON.parse(localStorage.getItem(CACHE_KEY)||'null');
+    if(c) cachedDB = c;
+  } catch(e){}
+  render();
+  await fetchDB();
+  if(currentRoute === 'home' || currentRoute === 'admin') render();
+})();
+</script>
+</body>
+</html>
