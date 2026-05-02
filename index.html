@@ -54,16 +54,21 @@
 <!-- ============================ HEADER ============================ -->
 <header class="bg-white shadow-sm border-b border-teal-100 sticky top-0 z-40">
   <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-    <div class="flex items-center gap-3">
+    <div onclick="go('home')" title="홈으로 이동" class="flex items-center gap-3 cursor-pointer hover:opacity-80 transition select-none">
       <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center text-white text-2xl shadow-md">🦷</div>
       <div>
         <h1 class="text-base sm:text-lg font-bold text-teal-800 leading-tight">유아 구강보건교육 효과 모니터링</h1>
         <p class="text-xs text-slate-500">동구보건소 × 울산과학대학교 치위생학과</p>
       </div>
     </div>
-    <button onclick="goAdmin()" class="text-xs sm:text-sm px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium transition flex items-center gap-1">
-      <span>🔒</span><span class="hidden sm:inline">관리자</span>
-    </button>
+    <div class="flex items-center gap-2">
+      <button onclick="go('home')" class="text-xs sm:text-sm px-3 py-2 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-700 font-semibold transition flex items-center gap-1 border border-teal-200">
+        <span>🏠</span><span class="hidden sm:inline">홈</span>
+      </button>
+      <button onclick="goAdmin()" class="text-xs sm:text-sm px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium transition flex items-center gap-1">
+        <span>🔒</span><span class="hidden sm:inline">관리자</span>
+      </button>
+    </div>
   </div>
 </header>
 
@@ -78,6 +83,14 @@
 
 <!-- ============================ SCRIPTS ============================ -->
 <script>
+/* ====== Supabase 설정 ======
+   ※ post_surveys 테이블에 다음 컬럼이 추가되어야 합니다.
+      - q10  jsonb        (다중응답 / 교육 후 행동 변화 관찰)
+      - q11  smallint/int (1~4 / 프로그램 지속 의향)
+      예: ALTER TABLE post_surveys
+            ADD COLUMN IF NOT EXISTS q10 jsonb DEFAULT '[]'::jsonb,
+            ADD COLUMN IF NOT EXISTS q11 smallint;
+*/
 /* ====== Supabase 설정 ====== */
 const SUPABASE_URL = 'https://yzycbpugeswycjouldmd.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6eWNicHVnZXN3eWNqb3VsZG1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0MjUwNzQsImV4cCI6MjA5MjAwMTA3NH0.cuXYGebhnaljK6tyYqNR14QfdH2hj7fR7nTHYTtnLZM';
@@ -134,6 +147,8 @@ function rowFromSupabase(r){
     q7b_etc: r.q7b_etc || '',
     q8: r.q8,
     q9: r.q9,
+    q10: r.q10 || [],
+    q11: r.q11,
   };
 }
 
@@ -149,7 +164,11 @@ function rowToSupabase(d, type){
     q1: d.q1, q2: d.q2, q3: d.q3, q4: d.q4, q5: d.q5,
     q6: d.q6, q7a: d.q7a, q7b: d.q7b, q7b_etc: d.q7b_etc || null, q8: d.q8,
   };
-  if(type === 'post') row.q9 = d.q9;
+  if(type === 'post') {
+    row.q9 = d.q9;
+    row.q10 = d.q10;
+    row.q11 = d.q11;
+  }
   return row;
 }
 
@@ -173,8 +192,12 @@ const COMMON_Q = [
     options:['잘 이해하고 설명할 수 있다 (예: "치아를 튼튼하게 해 줘요")','들어본 적은 있고 대략적으로 안다','이름은 들어봤지만 무슨 뜻인지 모른다','전혀 모른다'] },
 ];
 const POST_EXTRA_Q = [
-  { id:'q9', type:'radio', label:'9. 교육 내용, 환경 및 지원 사항을 고려할 때, 참여한 프로그램이 만족스러웠습니까?',
-    options:['매우 그렇다','다소 그렇다','보통이다','그렇지 않다'] },
+  { id:'q9', type:'radio', label:'9. [교육 만족도 / 재미·이해도] 우리 아이는 이번 구강보건교육을 재미있어 했습니까?',
+    options:['매우 그렇다','그렇다','보통이다','그렇지 않다','전혀 그렇지 않다'] },
+  { id:'q10', type:'check', label:'10. [교육 후 행동 변화 관찰] 교육 후, 우리 아이에게서 다음과 같은 변화가 나타났습니까?', sub:'(해당 항목 모두 체크 / 다중응답)',
+    options:['칫솔질을 더 자주 하려고 한다','칫솔 잡는 방법이나 닦는 방법(둥글게 닦기 등)이 달라졌다','단 음식·간식을 먹을 때 스스로 조심한다','충치·불소·치아에 대해 먼저 이야기한다','치과에 대한 두려움이 줄었다','특별한 변화를 느끼지 못했다'] },
+  { id:'q11', type:'radio', label:'11. [프로그램 지속 의향] 앞으로도 이러한 구강보건교육 프로그램이 정기적으로 진행되기를 원하십니까?',
+    options:['매우 원한다','원한다','보통','원하지 않는다'] },
 ];
 
 /* ====== 라우팅 ====== */
@@ -252,7 +275,7 @@ function renderHome(){
         <h3 class="text-xl font-bold mb-1">사후 설문</h3>
         <p class="text-sm text-amber-50 leading-relaxed">교육 <b>종료 후</b>에 작성해 주세요.</p>
         <div class="mt-4 text-xs text-amber-100 flex items-center gap-2">
-          <span>총 9문항 · 약 3분</span>
+          <span>총 11문항 · 약 4분</span>
           <span class="ml-auto bg-white/20 px-2 py-0.5 rounded">현재 ${postCount}건</span>
         </div>
       </button>
@@ -312,8 +335,17 @@ function renderSurvey(type){
         </h3>
         <div class="grid sm:grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">유치원명 <span class="text-rose-500">*</span></label>
-            <input type="text" name="kindergarten" required placeholder="예: ○○유치원" class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-${colorText}-400 focus:border-transparent outline-none">
+            <label class="block text-sm font-medium text-slate-700 mb-1">유치원/어린이집 <span class="text-rose-500">*</span></label>
+            <select name="kindergarten" required class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-${colorText}-400 focus:border-transparent outline-none bg-white">
+              <option value="">유치원/어린이집을 선택하세요</option>
+              <option value="환희지유치원">환희지유치원</option>
+              <option value="대성유치원">대성유치원</option>
+              <option value="꽃바위어린이집">꽃바위어린이집</option>
+              <option value="자이숲">자이숲</option>
+              <option value="울산시립연구형어린이집">울산시립연구형어린이집</option>
+              <option value="선재어린이집">선재어린이집</option>
+              <option value="동부경찰서어린이집">동부경찰서어린이집</option>
+            </select>
           </div>
           <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">아동 성명 <span class="text-rose-500">*</span></label>
@@ -617,8 +649,16 @@ function renderAdminOverview(db, matched){
       <canvas id="chart_self" height="200"></canvas>
     </div>
     <div class="bg-white border border-slate-200 rounded-xl p-4">
-      <h4 class="font-bold text-slate-700 mb-3">프로그램 만족도 (사후)</h4>
+      <h4 class="font-bold text-slate-700 mb-3">교육 만족도 / 재미·이해도 (사후)</h4>
       <canvas id="chart_satis" height="200"></canvas>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-xl p-4">
+      <h4 class="font-bold text-slate-700 mb-3">프로그램 지속 의향 (사후)</h4>
+      <canvas id="chart_intent" height="200"></canvas>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-xl p-4">
+      <h4 class="font-bold text-slate-700 mb-3">교육 후 행동 변화 관찰 (사후·다중응답)</h4>
+      <canvas id="chart_behavior" height="220"></canvas>
     </div>
   </div>
   `;
@@ -696,7 +736,8 @@ function renderAdminCompare(matched){
           <th class="px-2 py-2 border border-slate-200">스스로 칫솔질<br>(사전→사후)</th>
           <th class="px-2 py-2 border border-slate-200">마무리 양치<br>(사전→사후)</th>
           <th class="px-2 py-2 border border-slate-200">불소 인지도<br>(사전→사후)</th>
-          <th class="px-2 py-2 border border-slate-200">만족도</th>
+          <th class="px-2 py-2 border border-slate-200">교육 만족도<br>(재미·이해도)</th>
+          <th class="px-2 py-2 border border-slate-200">지속 의향</th>
         </tr>
       </thead>
       <tbody>
@@ -715,6 +756,7 @@ function renderAdminCompare(matched){
             return `<span class="text-slate-500">${a}→${b} =</span>`;
           };
           const satis = m.post.q9 ? `${m.post.q9}. ${POST_EXTRA_Q[0].options[m.post.q9-1]}` : '-';
+          const intent = m.post.q11 ? `${m.post.q11}. ${POST_EXTRA_Q[2].options[m.post.q11-1]}` : '-';
           return `
           <tr class="hover:bg-slate-50">
             <td class="px-2 py-1.5 border border-slate-200">${m.pre.kindergarten}</td>
@@ -725,6 +767,7 @@ function renderAdminCompare(matched){
             <td class="px-2 py-1.5 border border-slate-200 text-center">${arrowReverse(m.pre.q6, m.post.q6)}</td>
             <td class="px-2 py-1.5 border border-slate-200 text-center">${arrowReverse(m.pre.q8, m.post.q8)}</td>
             <td class="px-2 py-1.5 border border-slate-200 text-center text-xs">${satis}</td>
+            <td class="px-2 py-1.5 border border-slate-200 text-center text-xs">${intent}</td>
           </tr>`;
         }).join('')}
       </tbody>
@@ -818,14 +861,36 @@ function drawAdminCharts(){
     options:{scales:{y:{beginAtZero:true, ticks:{stepSize:1}}}}
   });
 
-  // 4) 만족도 (q9) - 사후만
-  const q9Counts = [0,0,0,0];
-  db.post.forEach(r=>{ if(r.q9>=1 && r.q9<=4) q9Counts[r.q9-1]++; });
+  // 4) 교육 만족도 (q9) - 5지선다
+  const q9Counts = [0,0,0,0,0];
+  db.post.forEach(r=>{ if(r.q9>=1 && r.q9<=5) q9Counts[r.q9-1]++; });
   charts.satis = new Chart(document.getElementById('chart_satis'), {
     type:'doughnut',
-    data:{labels:['매우 그렇다','다소 그렇다','보통이다','그렇지 않다'], datasets:[{data:q9Counts, backgroundColor:['#10b981','#14b8a6','#f59e0b','#f43f5e']}]},
+    data:{labels:['매우 그렇다','그렇다','보통이다','그렇지 않다','전혀 그렇지 않다'], datasets:[{data:q9Counts, backgroundColor:['#10b981','#14b8a6','#f59e0b','#fb923c','#f43f5e']}]},
     options:{plugins:{legend:{position:'bottom', labels:{font:{size:11}}}}}
   });
+
+  // 5) 프로그램 지속 의향 (q11) - 사후만
+  const q11Counts = [0,0,0,0];
+  db.post.forEach(r=>{ if(r.q11>=1 && r.q11<=4) q11Counts[r.q11-1]++; });
+  if(document.getElementById('chart_intent')){
+    charts.intent = new Chart(document.getElementById('chart_intent'), {
+      type:'doughnut',
+      data:{labels:['매우 원한다','원한다','보통','원하지 않는다'], datasets:[{data:q11Counts, backgroundColor:['#10b981','#14b8a6','#f59e0b','#f43f5e']}]},
+      options:{plugins:{legend:{position:'bottom', labels:{font:{size:11}}}}}
+    });
+  }
+
+  // 6) 행동 변화 관찰 (q10) - 다중응답
+  const q10Items = ['칫솔질을 더 자주 하려고 한다','칫솔 잡는 방법이나 닦는 방법(둥글게 닦기 등)이 달라졌다','단 음식·간식을 먹을 때 스스로 조심한다','충치·불소·치아에 대해 먼저 이야기한다','치과에 대한 두려움이 줄었다','특별한 변화를 느끼지 못했다'];
+  const q10Counts = q10Items.map(it => db.post.filter(r => Array.isArray(r.q10) && r.q10.includes(it)).length);
+  if(document.getElementById('chart_behavior')){
+    charts.behavior = new Chart(document.getElementById('chart_behavior'), {
+      type:'bar',
+      data:{labels:q10Items.map(s => s.length>14 ? s.slice(0,14)+'…' : s), datasets:[{label:'응답 수', data:q10Counts, backgroundColor:'#0d9488'}]},
+      options:{indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true, ticks:{stepSize:1}}}}
+    });
+  }
 }
 
 /* ====== 엑셀 다운로드 (다중 시트) ====== */
@@ -874,7 +939,9 @@ function downloadExcel(){
       '[Q7a]변화': numDelta(m.pre.q7a, m.post.q7a),
       '[Q8]불소인지(사전)': labelOf(COMMON_Q[7], m.pre.q8),
       '[Q8]불소인지(사후)': labelOf(COMMON_Q[7], m.post.q8),
-      '[Q9]만족도': labelOf(POST_EXTRA_Q[0], m.post.q9),
+      '[Q9]교육 만족도(재미·이해도)': labelOf(POST_EXTRA_Q[0], m.post.q9),
+      '[Q10]행동 변화(다중)': Array.isArray(m.post.q10) ? m.post.q10.join(' / ') : '',
+      '[Q11]프로그램 지속 의향': labelOf(POST_EXTRA_Q[2], m.post.q11),
     }));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cmpRows), '3.사전·사후 비교');
   } else {
@@ -947,9 +1014,17 @@ function buildStats(db, matched){
     ['선택지','사전','사후'],
     ...COMMON_Q[7].options.map((o,i)=>[`${i+1}. ${o}`, db.pre.filter(r=>r.q8===i+1).length, db.post.filter(r=>r.q8===i+1).length]),
     ['', ''],
-    ['6. [Q9] 프로그램 만족도 (사후)'],
+    ['6. [Q9] 교육 만족도 (재미·이해도, 사후)'],
     ['선택지','건수'],
     ...POST_EXTRA_Q[0].options.map((o,i)=>[`${i+1}. ${o}`, db.post.filter(r=>r.q9===i+1).length]),
+    ['', ''],
+    ['7. [Q10] 교육 후 행동 변화 관찰 (사후·다중응답)'],
+    ['선택지','체크 수'],
+    ...POST_EXTRA_Q[1].options.map((o,i)=>[o, db.post.filter(r=>Array.isArray(r.q10) && r.q10.includes(o)).length]),
+    ['', ''],
+    ['8. [Q11] 프로그램 지속 의향 (사후)'],
+    ['선택지','건수'],
+    ...POST_EXTRA_Q[2].options.map((o,i)=>[`${i+1}. ${o}`, db.post.filter(r=>r.q11===i+1).length]),
   ];
   return rows;
 }
@@ -973,16 +1048,23 @@ function buildVizData(db){
     ['선택지','사전','사후'],
     ...COMMON_Q[2].options.map((o,i)=>[o, db.pre.filter(r=>r.q3===i+1).length, db.post.filter(r=>r.q3===i+1).length]),
     ['', ''],
-    ['# 만족도(Q9) - 사후'],
+    ['# 교육 만족도(Q9, 재미·이해도) - 사후'],
     ['선택지','건수'],
     ...POST_EXTRA_Q[0].options.map((o,i)=>[o, db.post.filter(r=>r.q9===i+1).length]),
+    ['', ''],
+    ['# 교육 후 행동 변화 관찰(Q10) - 사후·다중응답'],
+    ['선택지','체크 수'],
+    ...POST_EXTRA_Q[1].options.map((o,i)=>[o, db.post.filter(r=>Array.isArray(r.q10) && r.q10.includes(o)).length]),
+    ['', ''],
+    ['# 프로그램 지속 의향(Q11) - 사후'],
+    ['선택지','건수'],
+    ...POST_EXTRA_Q[2].options.map((o,i)=>[o, db.post.filter(r=>r.q11===i+1).length]),
   ];
   return rows;
 }
 
-/* ====== PDF 보고서 다운로드 (html2canvas + jsPDF) ====== */
+/* ====== PDF 보고서 다운로드 (섹션 단위 페이지 분할) ====== */
 async function downloadPDF(){
-  // 임시 보고서 DOM 생성
   const db = loadDB();
   const matched = matchPrePost(db);
   const reportEl = document.createElement('div');
@@ -990,29 +1072,67 @@ async function downloadPDF(){
   reportEl.style.cssText = 'position:fixed; left:-99999px; top:0; background:white; width:794px; padding:40px; font-family:Pretendard, sans-serif;';
   reportEl.innerHTML = buildPdfHtml(db, matched);
   document.body.appendChild(reportEl);
-  // 폰트 로딩 대기 후 차트 그리기
+  // 폰트/차트 로딩 대기
   await new Promise(r=>setTimeout(r,100));
   if(document.fonts && document.fonts.ready) await document.fonts.ready;
   drawPdfCharts(db);
-  await new Promise(r=>setTimeout(r,800));
+  await new Promise(r=>setTimeout(r,900));
 
-  const canvas = await html2canvas(reportEl, {scale:2, useCORS:true, backgroundColor:'#ffffff'});
-  const imgData = canvas.toDataURL('image/jpeg', 0.92);
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF('p','mm','a4');
   const pdfW = 210, pdfH = 297;
-  const imgW = pdfW;
-  const imgH = canvas.height * imgW / canvas.width;
-  let heightLeft = imgH;
-  let position = 0;
-  pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH);
-  heightLeft -= pdfH;
-  while(heightLeft > 0){
-    position = heightLeft - imgH;
-    pdf.addPage();
-    pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH);
-    heightLeft -= pdfH;
+  const margin = 12; // mm
+  const usableW = pdfW - margin*2;
+  const usableH = pdfH - margin*2;
+
+  const sections = reportEl.querySelectorAll('.pdf-section');
+  let currentY = margin;
+  let firstOnPage = true;
+
+  for(const section of sections){
+    const canvas = await html2canvas(section, {scale:2, useCORS:true, backgroundColor:'#ffffff'});
+    const imgW = usableW;
+    const imgH_mm = canvas.height * imgW / canvas.width;
+
+    // 한 섹션이 한 페이지보다 큰 경우 → 캔버스를 잘라서 여러 페이지에 분할
+    if(imgH_mm > usableH){
+      if(!firstOnPage){ pdf.addPage(); currentY = margin; firstOnPage = true; }
+      const pxPerMm = canvas.width / imgW;
+      const sliceHpx = Math.floor(usableH * pxPerMm);
+      let yPx = 0;
+      const sliceCanvas = document.createElement('canvas');
+      sliceCanvas.width = canvas.width;
+      const ctx = sliceCanvas.getContext('2d');
+      while(yPx < canvas.height){
+        const thisHpx = Math.min(sliceHpx, canvas.height - yPx);
+        sliceCanvas.height = thisHpx;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0,0,sliceCanvas.width, thisHpx);
+        ctx.drawImage(canvas, 0, yPx, canvas.width, thisHpx, 0, 0, canvas.width, thisHpx);
+        const sliceImg = sliceCanvas.toDataURL('image/jpeg', 0.92);
+        const thisHmm = thisHpx / pxPerMm;
+        if(!firstOnPage){ pdf.addPage(); currentY = margin; }
+        pdf.addImage(sliceImg, 'JPEG', margin, currentY, imgW, thisHmm);
+        currentY += thisHmm;
+        yPx += thisHpx;
+        firstOnPage = false;
+      }
+      currentY += 4;
+      continue;
+    }
+
+    // 자리 부족하면 다음 페이지로 (현재 페이지 윗공간이 남더라도)
+    if(!firstOnPage && (currentY + imgH_mm) > (pdfH - margin)){
+      pdf.addPage();
+      currentY = margin;
+      firstOnPage = true;
+    }
+    const imgData = canvas.toDataURL('image/jpeg', 0.92);
+    pdf.addImage(imgData, 'JPEG', margin, currentY, imgW, imgH_mm);
+    currentY += imgH_mm + 4;
+    firstOnPage = false;
   }
+
   pdf.save(`유아구강보건교육_보고서_${new Date().toISOString().slice(0,10)}.pdf`);
   reportEl.remove();
 }
@@ -1027,97 +1147,160 @@ function buildPdfHtml(db, matched){
   }).join('');
 
   return `
-  <div style="border-bottom:3px solid #0d9488; padding-bottom:14px; margin-bottom:24px;">
+  <div class="pdf-section" style="border-bottom:3px solid #0d9488; padding-bottom:14px; margin-bottom:18px;">
     <h1 style="font-size:24px; color:#0f766e; margin:0; font-weight:bold;">🦷 유아 구강보건교육 효과 모니터링 보고서</h1>
     <p style="color:#64748b; font-size:13px; margin:6px 0 0 0;">2026년 동구보건소 × 울산과학대학교 치위생학과 | 작성일: ${today}</p>
   </div>
 
-  <h2 style="color:#0f766e; font-size:17px; margin:18px 0 10px 0;">1. 응답 현황</h2>
-  <table style="width:100%; border-collapse:collapse; font-size:13px;">
-    <thead><tr style="background:#f0fdfa;">
-      <th style="padding:8px;border:1px solid #99f6e4">사전 응답</th>
-      <th style="padding:8px;border:1px solid #99f6e4">사후 응답</th>
-      <th style="padding:8px;border:1px solid #99f6e4">사전·사후 매칭</th>
-    </tr></thead>
-    <tbody><tr>
-      <td style="padding:10px;border:1px solid #99f6e4;text-align:center;font-size:18px;font-weight:bold;color:#0f766e">${db.pre.length}건</td>
-      <td style="padding:10px;border:1px solid #99f6e4;text-align:center;font-size:18px;font-weight:bold;color:#b45309">${db.post.length}건</td>
-      <td style="padding:10px;border:1px solid #99f6e4;text-align:center;font-size:18px;font-weight:bold;color:#7c3aed">${matched.length}쌍</td>
-    </tr></tbody>
-  </table>
-
-  <h2 style="color:#0f766e; font-size:17px; margin:24px 0 10px 0;">2. 핵심 지표 변화 (사전 → 사후)</h2>
-  <table style="width:100%; border-collapse:collapse; font-size:13px;">
-    <thead><tr style="background:#f0fdfa;">
-      <th style="padding:8px;border:1px solid #99f6e4;text-align:left">항목</th>
-      <th style="padding:8px;border:1px solid #99f6e4">사전 평균</th>
-      <th style="padding:8px;border:1px solid #99f6e4">사후 평균</th>
-      <th style="padding:8px;border:1px solid #99f6e4">변화</th>
-    </tr></thead>
-    <tbody>
-      <tr><td style="padding:8px;border:1px solid #e2e8f0">하루 평균 칫솔질 횟수 (회)</td>
-        <td style="padding:8px;border:1px solid #e2e8f0;text-align:center">${avg(db.pre.map(r=>r.q2))}</td>
-        <td style="padding:8px;border:1px solid #e2e8f0;text-align:center">${avg(db.post.map(r=>r.q2))}</td>
-        <td style="padding:8px;border:1px solid #e2e8f0;text-align:center">${diffStr(avg(db.pre.map(r=>r.q2)), avg(db.post.map(r=>r.q2)))}</td>
-      </tr>
-      <tr><td style="padding:8px;border:1px solid #e2e8f0">하루 평균 간식 횟수 (회)</td>
-        <td style="padding:8px;border:1px solid #e2e8f0;text-align:center">${avg(db.pre.map(r=>r.q7a))}</td>
-        <td style="padding:8px;border:1px solid #e2e8f0;text-align:center">${avg(db.post.map(r=>r.q7a))}</td>
-        <td style="padding:8px;border:1px solid #e2e8f0;text-align:center">${diffStr(avg(db.pre.map(r=>r.q7a)), avg(db.post.map(r=>r.q7a)), true)}</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <h2 style="color:#0f766e; font-size:17px; margin:24px 0 10px 0;">3. 시각화 차트</h2>
-  <div style="display:flex; gap:12px;">
-    <div style="flex:1; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
-      <p style="font-size:12px; font-weight:bold; margin:0 0 8px 0;">불소 인지도 (사전 vs 사후)</p>
-      <canvas id="pdf_chart_q8" width="350" height="200"></canvas>
-    </div>
-    <div style="flex:1; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
-      <p style="font-size:12px; font-weight:bold; margin:0 0 8px 0;">스스로 칫솔질 (사전 vs 사후)</p>
-      <canvas id="pdf_chart_q3" width="350" height="200"></canvas>
-    </div>
+  <div class="pdf-section" style="margin-bottom:18px;">
+    <h2 style="color:#0f766e; font-size:17px; margin:0 0 10px 0;">1. 응답 현황</h2>
+    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+      <thead><tr style="background:#f0fdfa;">
+        <th style="padding:8px;border:1px solid #99f6e4">사전 응답</th>
+        <th style="padding:8px;border:1px solid #99f6e4">사후 응답</th>
+        <th style="padding:8px;border:1px solid #99f6e4">사전·사후 매칭</th>
+      </tr></thead>
+      <tbody><tr>
+        <td style="padding:10px;border:1px solid #99f6e4;text-align:center;font-size:18px;font-weight:bold;color:#0f766e">${db.pre.length}건</td>
+        <td style="padding:10px;border:1px solid #99f6e4;text-align:center;font-size:18px;font-weight:bold;color:#b45309">${db.post.length}건</td>
+        <td style="padding:10px;border:1px solid #99f6e4;text-align:center;font-size:18px;font-weight:bold;color:#7c3aed">${matched.length}쌍</td>
+      </tr></tbody>
+    </table>
   </div>
-  <div style="display:flex; gap:12px; margin-top:12px;">
-    <div style="flex:1; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
-      <p style="font-size:12px; font-weight:bold; margin:0 0 8px 0;">마무리 양치 (사전 vs 사후)</p>
-      <canvas id="pdf_chart_q6" width="350" height="200"></canvas>
-    </div>
-    <div style="flex:1; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
-      <p style="font-size:12px; font-weight:bold; margin:0 0 8px 0;">프로그램 만족도</p>
-      <canvas id="pdf_chart_q9" width="350" height="200"></canvas>
+
+  <div class="pdf-section" style="margin-bottom:18px;">
+    <h2 style="color:#0f766e; font-size:17px; margin:0 0 10px 0;">2. 핵심 지표 변화 (사전 → 사후)</h2>
+    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+      <thead><tr style="background:#f0fdfa;">
+        <th style="padding:8px;border:1px solid #99f6e4;text-align:left">항목</th>
+        <th style="padding:8px;border:1px solid #99f6e4">사전 평균</th>
+        <th style="padding:8px;border:1px solid #99f6e4">사후 평균</th>
+        <th style="padding:8px;border:1px solid #99f6e4">변화</th>
+      </tr></thead>
+      <tbody>
+        <tr><td style="padding:8px;border:1px solid #e2e8f0">하루 평균 칫솔질 횟수 (회)</td>
+          <td style="padding:8px;border:1px solid #e2e8f0;text-align:center">${avg(db.pre.map(r=>r.q2))}</td>
+          <td style="padding:8px;border:1px solid #e2e8f0;text-align:center">${avg(db.post.map(r=>r.q2))}</td>
+          <td style="padding:8px;border:1px solid #e2e8f0;text-align:center">${diffStr(avg(db.pre.map(r=>r.q2)), avg(db.post.map(r=>r.q2)))}</td>
+        </tr>
+        <tr><td style="padding:8px;border:1px solid #e2e8f0">하루 평균 간식 횟수 (회)</td>
+          <td style="padding:8px;border:1px solid #e2e8f0;text-align:center">${avg(db.pre.map(r=>r.q7a))}</td>
+          <td style="padding:8px;border:1px solid #e2e8f0;text-align:center">${avg(db.post.map(r=>r.q7a))}</td>
+          <td style="padding:8px;border:1px solid #e2e8f0;text-align:center">${diffStr(avg(db.pre.map(r=>r.q7a)), avg(db.post.map(r=>r.q7a)), true)}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pdf-section" style="margin-bottom:18px;">
+    <h2 style="color:#0f766e; font-size:17px; margin:0 0 10px 0;">3-1. 시각화 차트 (사전 vs 사후)</h2>
+    <div style="display:flex; gap:12px;">
+      <div style="flex:1; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
+        <p style="font-size:12px; font-weight:bold; margin:0 0 8px 0;">불소 인지도</p>
+        <canvas id="pdf_chart_q8" width="350" height="200"></canvas>
+      </div>
+      <div style="flex:1; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
+        <p style="font-size:12px; font-weight:bold; margin:0 0 8px 0;">스스로 칫솔질</p>
+        <canvas id="pdf_chart_q3" width="350" height="200"></canvas>
+      </div>
     </div>
   </div>
 
-  <h2 style="color:#0f766e; font-size:17px; margin:24px 0 10px 0;">4. 불소 인지도 (Q8) 응답 분포</h2>
-  <table style="width:100%; border-collapse:collapse; font-size:13px;">
-    <thead><tr style="background:#f0fdfa;">
-      <th style="padding:8px;border:1px solid #99f6e4;text-align:left">선택지</th>
-      <th style="padding:8px;border:1px solid #99f6e4;width:80px">사전</th>
-      <th style="padding:8px;border:1px solid #99f6e4;width:80px">사후</th>
-    </tr></thead>
-    <tbody>${distRow(COMMON_Q[7],'q8')}</tbody>
-  </table>
-
-  <h2 style="color:#0f766e; font-size:17px; margin:24px 0 10px 0;">5. 마무리 양치 (Q6) 응답 분포</h2>
-  <table style="width:100%; border-collapse:collapse; font-size:13px;">
-    <thead><tr style="background:#f0fdfa;">
-      <th style="padding:8px;border:1px solid #99f6e4;text-align:left">선택지</th>
-      <th style="padding:8px;border:1px solid #99f6e4;width:80px">사전</th>
-      <th style="padding:8px;border:1px solid #99f6e4;width:80px">사후</th>
-    </tr></thead>
-    <tbody>${distRow(COMMON_Q[5],'q6')}</tbody>
-  </table>
-
-  <h2 style="color:#0f766e; font-size:17px; margin:24px 0 10px 0;">6. 종합 의견</h2>
-  <div style="background:#f8fafc; border-left:4px solid #0d9488; padding:14px; font-size:13px; line-height:1.6;">
-    <p style="margin:0;">${buildSummary(db, matched)}</p>
+  <div class="pdf-section" style="margin-bottom:18px;">
+    <h2 style="color:#0f766e; font-size:17px; margin:0 0 10px 0;">3-2. 시각화 차트</h2>
+    <div style="display:flex; gap:12px;">
+      <div style="flex:1; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
+        <p style="font-size:12px; font-weight:bold; margin:0 0 8px 0;">마무리 양치 (사전 vs 사후)</p>
+        <canvas id="pdf_chart_q6" width="350" height="200"></canvas>
+      </div>
+      <div style="flex:1; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
+        <p style="font-size:12px; font-weight:bold; margin:0 0 8px 0;">교육 만족도 (재미·이해도)</p>
+        <canvas id="pdf_chart_q9" width="350" height="200"></canvas>
+      </div>
+    </div>
   </div>
 
-  <p style="text-align:center; color:#94a3b8; font-size:11px; margin-top:30px; border-top:1px solid #e2e8f0; padding-top:14px;">
+  <div class="pdf-section" style="margin-bottom:18px;">
+    <h2 style="color:#0f766e; font-size:17px; margin:0 0 10px 0;">3-3. 시각화 차트 (사후)</h2>
+    <div style="display:flex; gap:12px;">
+      <div style="flex:1; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
+        <p style="font-size:12px; font-weight:bold; margin:0 0 8px 0;">프로그램 지속 의향</p>
+        <canvas id="pdf_chart_q11" width="350" height="200"></canvas>
+      </div>
+      <div style="flex:1; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
+        <p style="font-size:12px; font-weight:bold; margin:0 0 8px 0;">교육 후 행동 변화 관찰 (다중응답)</p>
+        <canvas id="pdf_chart_q10" width="350" height="240"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="pdf-section" style="margin-bottom:18px;">
+    <h2 style="color:#0f766e; font-size:17px; margin:0 0 10px 0;">4. 불소 인지도 (Q8) 응답 분포</h2>
+    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+      <thead><tr style="background:#f0fdfa;">
+        <th style="padding:8px;border:1px solid #99f6e4;text-align:left">선택지</th>
+        <th style="padding:8px;border:1px solid #99f6e4;width:80px">사전</th>
+        <th style="padding:8px;border:1px solid #99f6e4;width:80px">사후</th>
+      </tr></thead>
+      <tbody>${distRow(COMMON_Q[7],'q8')}</tbody>
+    </table>
+  </div>
+
+  <div class="pdf-section" style="margin-bottom:18px;">
+    <h2 style="color:#0f766e; font-size:17px; margin:0 0 10px 0;">5. 마무리 양치 (Q6) 응답 분포</h2>
+    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+      <thead><tr style="background:#f0fdfa;">
+        <th style="padding:8px;border:1px solid #99f6e4;text-align:left">선택지</th>
+        <th style="padding:8px;border:1px solid #99f6e4;width:80px">사전</th>
+        <th style="padding:8px;border:1px solid #99f6e4;width:80px">사후</th>
+      </tr></thead>
+      <tbody>${distRow(COMMON_Q[5],'q6')}</tbody>
+    </table>
+  </div>
+
+  <div class="pdf-section" style="margin-bottom:18px;">
+    <h2 style="color:#0f766e; font-size:17px; margin:0 0 10px 0;">6-1. 사후 만족도 — 교육 만족도 (Q9, 재미·이해도)</h2>
+    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+      <thead><tr style="background:#f0fdfa;">
+        <th style="padding:8px;border:1px solid #99f6e4;text-align:left">선택지</th>
+        <th style="padding:8px;border:1px solid #99f6e4;width:90px">사후 응답 수</th>
+      </tr></thead>
+      <tbody>${POST_EXTRA_Q[0].options.map((o,i)=>`<tr><td style="padding:6px;border:1px solid #e2e8f0">${i+1}. ${o}</td><td style="padding:6px;border:1px solid #e2e8f0;text-align:center">${db.post.filter(r=>r.q9===i+1).length}</td></tr>`).join('')}</tbody>
+    </table>
+  </div>
+
+  <div class="pdf-section" style="margin-bottom:18px;">
+    <h2 style="color:#0f766e; font-size:17px; margin:0 0 10px 0;">6-2. 사후 만족도 — 교육 후 행동 변화 관찰 (Q10, 다중응답)</h2>
+    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+      <thead><tr style="background:#f0fdfa;">
+        <th style="padding:8px;border:1px solid #99f6e4;text-align:left">관찰 항목</th>
+        <th style="padding:8px;border:1px solid #99f6e4;width:90px">체크 수</th>
+      </tr></thead>
+      <tbody>${POST_EXTRA_Q[1].options.map(o=>`<tr><td style="padding:6px;border:1px solid #e2e8f0">${o}</td><td style="padding:6px;border:1px solid #e2e8f0;text-align:center">${db.post.filter(r=>Array.isArray(r.q10) && r.q10.includes(o)).length}</td></tr>`).join('')}</tbody>
+    </table>
+  </div>
+
+  <div class="pdf-section" style="margin-bottom:18px;">
+    <h2 style="color:#0f766e; font-size:17px; margin:0 0 10px 0;">6-3. 사후 만족도 — 프로그램 지속 의향 (Q11)</h2>
+    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+      <thead><tr style="background:#f0fdfa;">
+        <th style="padding:8px;border:1px solid #99f6e4;text-align:left">선택지</th>
+        <th style="padding:8px;border:1px solid #99f6e4;width:90px">사후 응답 수</th>
+      </tr></thead>
+      <tbody>${POST_EXTRA_Q[2].options.map((o,i)=>`<tr><td style="padding:6px;border:1px solid #e2e8f0">${i+1}. ${o}</td><td style="padding:6px;border:1px solid #e2e8f0;text-align:center">${db.post.filter(r=>r.q11===i+1).length}</td></tr>`).join('')}</tbody>
+    </table>
+  </div>
+
+  <div class="pdf-section" style="margin-bottom:18px;">
+    <h2 style="color:#0f766e; font-size:17px; margin:0 0 10px 0;">7. 종합 의견</h2>
+    <div style="background:#f8fafc; border-left:4px solid #0d9488; padding:14px 16px; font-size:13px; line-height:1.7; color:#1e293b;">
+      ${buildSummary(db, matched)}
+    </div>
+  </div>
+
+  <div class="pdf-section" style="text-align:center; color:#94a3b8; font-size:11px; margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;">
     동구보건소 × 울산과학대학교 치위생학과 · 문의: 유진실 교수 (010-2494-3875 / jsyu@uc.ac.kr)
-  </p>
+  </div>
   `;
 }
 
@@ -1134,21 +1317,76 @@ function diffStr(a,b,reverse=false){
 }
 
 function buildSummary(db, matched){
-  if(db.pre.length===0 && db.post.length===0) return '아직 수집된 응답이 없습니다.';
-  const avgPre = db.pre.length ? (db.pre.reduce((a,b)=>a+(+b.q2||0),0)/db.pre.length) : 0;
-  const avgPost = db.post.length ? (db.post.reduce((a,b)=>a+(+b.q2||0),0)/db.post.length) : 0;
-  const fluPre1 = db.pre.filter(r=>r.q8===1||r.q8===2).length;
-  const fluPost1 = db.post.filter(r=>r.q8===1||r.q8===2).length;
-  const flu = (cnt, total)=> total ? Math.round(cnt/total*100) : 0;
+  if(db.pre.length===0 && db.post.length===0) return '<p style="margin:0;">아직 수집된 응답이 없습니다.</p>';
+
+  const avg = arr => arr.length ? (arr.reduce((a,b)=>a+(+b||0),0)/arr.length) : 0;
+  const pct = (cnt, total)=> total ? Math.round(cnt/total*100) : 0;
+
+  const avgPre   = avg(db.pre.map(r=>r.q2));
+  const avgPost  = avg(db.post.map(r=>r.q2));
+  const snackPre = avg(db.pre.map(r=>r.q7a));
+  const snackPost= avg(db.post.map(r=>r.q7a));
+
+  const finPre  = db.pre.filter(r=>r.q6===1||r.q6===2).length;
+  const finPost = db.post.filter(r=>r.q6===1||r.q6===2).length;
+  const finPreP = pct(finPre, db.pre.length);
+  const finPostP= pct(finPost, db.post.length);
+
+  const fluPre  = db.pre.filter(r=>r.q8===1||r.q8===2).length;
+  const fluPost = db.post.filter(r=>r.q8===1||r.q8===2).length;
+  const fluPreP = pct(fluPre, db.pre.length);
+  const fluPostP= pct(fluPost, db.post.length);
+
   const satisGood = db.post.filter(r=>r.q9===1||r.q9===2).length;
-  const satisRate = db.post.length ? Math.round(satisGood/db.post.length*100) : 0;
+  const satisRate = pct(satisGood, db.post.length);
+  const intentGood= db.post.filter(r=>r.q11===1||r.q11===2).length;
+  const intentRate= pct(intentGood, db.post.length);
+
+  // Q10 행동 변화 상위 3개
+  const q10Items = POST_EXTRA_Q[1].options;
+  const q10Counts = q10Items.map(it => db.post.filter(r => Array.isArray(r.q10) && r.q10.includes(it)).length);
+  const top3 = q10Items.map((o,i)=>({o, c:q10Counts[i]}))
+                .filter(x => x.o !== '특별한 변화를 느끼지 못했다')
+                .sort((a,b)=>b.c-a.c)
+                .slice(0,3)
+                .filter(x => x.c > 0);
+
+  // 변화 해석 문구
+  const brushDelta = avgPost - avgPre;
+  const brushDir = brushDelta >= 0.1 ? `<b style="color:#059669">${brushDelta.toFixed(2)}회 증가</b>하여 칫솔질 빈도가 개선된 것으로 나타났습니다`
+                  : brushDelta <= -0.1 ? `<b style="color:#dc2626">${Math.abs(brushDelta).toFixed(2)}회 감소</b>하였습니다`
+                  : '큰 변화 없이 유사한 수준을 유지하였습니다';
+  const fluDelta = fluPostP - fluPreP;
+  const fluDir = fluDelta >= 5 ? `사전 ${fluPreP}% → 사후 ${fluPostP}%로 <b style="color:#059669">${fluDelta}%p 상승</b>하여 교육 효과가 확인됩니다`
+                : fluDelta <= -5 ? `사전 ${fluPreP}% → 사후 ${fluPostP}%로 <b style="color:#dc2626">${Math.abs(fluDelta)}%p 감소</b>하였습니다`
+                : `사전 ${fluPreP}% → 사후 ${fluPostP}%로 큰 변동은 없으나, 후속 교육을 통해 정착이 필요합니다`;
+  const finDelta = finPostP - finPreP;
+  const finDir = finDelta >= 5 ? `사전 ${finPreP}% → 사후 ${finPostP}%로 <b style="color:#059669">${finDelta}%p 상승</b>` 
+                : finDelta <= -5 ? `사전 ${finPreP}% → 사후 ${finPostP}%로 ${Math.abs(finDelta)}%p 감소`
+                : `사전 ${finPreP}% → 사후 ${finPostP}%로 비슷한 수준`;
 
   return `
-    본 보고서는 사전 ${db.pre.length}건, 사후 ${db.post.length}건의 응답을 바탕으로 작성되었습니다.
-    하루 평균 칫솔질 횟수는 사전 ${avgPre.toFixed(2)}회에서 사후 ${avgPost.toFixed(2)}회로 변화하였으며,
-    불소 역할에 대해 '잘 이해' 또는 '대략 안다'고 응답한 비율은 사전 ${flu(fluPre1, db.pre.length)}%에서 사후 ${flu(fluPost1, db.post.length)}%로 나타났습니다.
-    프로그램에 '매우 그렇다·다소 그렇다'로 만족한 비율은 ${satisRate}%입니다.
-    매칭된 ${matched.length}쌍을 통해 개별 행동 변화를 추적할 수 있으며, 추가 분석은 첨부 엑셀 파일을 참고해 주시기 바랍니다.
+    <p style="margin:0 0 10px 0;"><b>① 응답 현황.</b>
+      본 보고서는 사전 <b>${db.pre.length}건</b>, 사후 <b>${db.post.length}건</b>의 응답을 토대로 작성되었으며, 사전·사후 모두 응답한 매칭 표본은 <b>${matched.length}쌍</b>입니다. 매칭 표본은 동일 아동의 변화를 직접 추적하는 핵심 자료로 활용되었습니다.
+    </p>
+    <p style="margin:0 0 10px 0;"><b>② 칫솔질 빈도 변화.</b>
+      하루 평균 칫솔질 횟수는 사전 <b>${avgPre.toFixed(2)}회</b>에서 사후 <b>${avgPost.toFixed(2)}회</b>로 ${brushDir}. 한편 하루 평균 간식 횟수는 사전 ${snackPre.toFixed(2)}회에서 사후 ${snackPost.toFixed(2)}회로 변화하였습니다.
+    </p>
+    <p style="margin:0 0 10px 0;"><b>③ 부모의 마무리 양치 참여.</b>
+      '매번' 또는 '가끔' 마무리 양치를 해주는 비율은 ${finDir}하였습니다. 부모의 적극적인 마무리 양치 참여는 만 5~7세 아동의 치아우식 예방에서 가장 강력한 보호 요인이므로, 가정 내 실천이 지속되도록 안내가 필요합니다.
+    </p>
+    <p style="margin:0 0 10px 0;"><b>④ 불소 역할에 대한 인지도.</b>
+      불소 역할에 대해 '잘 이해' 또는 '대략 안다'고 응답한 비율은 ${fluDir}.
+    </p>
+    <p style="margin:0 0 10px 0;"><b>⑤ 사후 만족도 평가.</b>
+      교육의 재미·이해도에 대해 '매우 그렇다·그렇다'고 응답한 비율은 <b style="color:#0f766e">${satisRate}%</b>, 프로그램이 정기적으로 진행되기를 '매우 원한다·원한다'고 응답한 비율은 <b style="color:#0f766e">${intentRate}%</b>로 나타났습니다.
+      ${top3.length ? `학부모가 관찰한 교육 후 주요 행동 변화는 <b>${top3.map(x=>`${x.o} (${x.c}건)`).join(', ')}</b> 순이었으며, 이는 단순 지식 전달을 넘어 실제 행동·태도 변화로 이어졌음을 시사합니다.` : '학부모가 관찰한 교육 후 행동 변화 응답이 아직 충분하지 않아, 추가 응답 수집 후 재분석이 필요합니다.'}
+    </p>
+    <p style="margin:0;"><b>⑥ 종합 평가 및 제언.</b>
+      이번 구강보건교육은 아동의 기본 행동(칫솔질·간식)·보조 행동(마무리 양치)·인지(불소 역할)의 세 측면 모두에 영향을 미친 것으로 분석되며, 학부모 만족도(${satisRate}%)와 지속 의향(${intentRate}%) 또한 양호한 수준입니다.
+      향후에는 ① 가정 연계 활동(체크리스트·실천 카드) 병행으로 행동 정착 강화, ② 교육 종료 후 1~3개월 시점 추적 조사로 행동 유지율 확인, ③ 매칭 ${matched.length}쌍에 대한 개별 변화 데이터 심층 분석을 권장합니다.
+      세부 개별 응답은 첨부 엑셀 파일을 참고해 주시기 바랍니다.
+    </p>
   `;
 }
 
@@ -1178,10 +1416,28 @@ function drawPdfCharts(db){
   });
   new Chart(document.getElementById('pdf_chart_q9'), {
     type:'doughnut',
-    data:{labels:['매우 그렇다','다소 그렇다','보통이다','그렇지 않다'],
-      datasets:[{data:distQ(db.post,'q9',4), backgroundColor:['#10b981','#14b8a6','#f59e0b','#f43f5e']}]},
+    data:{labels:['매우 그렇다','그렇다','보통이다','그렇지 않다','전혀 그렇지 않다'],
+      datasets:[{data:distQ(db.post,'q9',5), backgroundColor:['#10b981','#14b8a6','#f59e0b','#fb923c','#f43f5e']}]},
     options:{responsive:false, animation:false, plugins:{legend:{position:'bottom', labels:{font:{size:10}}}}}
   });
+  if(document.getElementById('pdf_chart_q11')){
+    new Chart(document.getElementById('pdf_chart_q11'), {
+      type:'doughnut',
+      data:{labels:['매우 원한다','원한다','보통','원하지 않는다'],
+        datasets:[{data:distQ(db.post,'q11',4), backgroundColor:['#10b981','#14b8a6','#f59e0b','#f43f5e']}]},
+      options:{responsive:false, animation:false, plugins:{legend:{position:'bottom', labels:{font:{size:10}}}}}
+    });
+  }
+  if(document.getElementById('pdf_chart_q10')){
+    const q10Items = ['칫솔질을 더 자주 하려고 한다','칫솔 잡는 방법이나 닦는 방법(둥글게 닦기 등)이 달라졌다','단 음식·간식을 먹을 때 스스로 조심한다','충치·불소·치아에 대해 먼저 이야기한다','치과에 대한 두려움이 줄었다','특별한 변화를 느끼지 못했다'];
+    const q10Counts = q10Items.map(it => db.post.filter(r => Array.isArray(r.q10) && r.q10.includes(it)).length);
+    new Chart(document.getElementById('pdf_chart_q10'), {
+      type:'bar',
+      data:{labels:q10Items.map(s => s.length>16 ? s.slice(0,16)+'…' : s),
+        datasets:[{label:'응답 수', data:q10Counts, backgroundColor:'#0d9488'}]},
+      options:{responsive:false, animation:false, indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true, ticks:{stepSize:1, font:{size:9}}}, y:{ticks:{font:{size:9}}}}}
+    });
+  }
 }
 
 /* ====== JSON 백업/삭제 ====== */
