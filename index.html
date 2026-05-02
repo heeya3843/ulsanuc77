@@ -21,6 +21,7 @@
   };
 </script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -83,6 +84,12 @@
 
 <!-- ============================ SCRIPTS ============================ -->
 <script>
+/* ====== Chart.js datalabels 플러그인 등록 (전역 기본 OFF, 차트별로 ON) ====== */
+if(typeof ChartDataLabels !== 'undefined' && typeof Chart !== 'undefined'){
+  Chart.register(ChartDataLabels);
+  Chart.defaults.plugins.datalabels = { display: false };
+}
+
 /* ====== Supabase 설정 ======
    ※ post_surveys 테이블에 다음 컬럼이 추가되어야 합니다.
       - q10  jsonb        (다중응답 / 교육 후 행동 변화 관찰)
@@ -228,11 +235,12 @@ function renderHome(){
     <div class="flex items-start gap-3">
       <div class="text-3xl flex-shrink-0">⚠️</div>
       <div>
-        <h2 class="text-lg sm:text-xl font-bold text-rose-700 mb-1">반드시 사전 · 사후 설문을 모두 작성해 주세요!</h2>
+        <h2 class="text-lg sm:text-xl font-bold text-rose-700 mb-1">반드시 사전(프로그램 참여 전) · 사후(프로그램 참여 후) 설문을 모두 작성해 주세요!</h2>
         <p class="text-sm sm:text-base text-slate-700 leading-relaxed">
           본 프로그램의 효과를 정확히 평가하기 위해서는 <b class="text-rose-600">교육 시작 전 '사전 설문'</b>과
-          <b class="text-rose-600">교육 종료 후 '사후 설문'</b>이 모두 필요합니다.<br>
-          한 가지만 작성된 응답은 분석에서 제외될 수 있습니다.
+          <b class="text-rose-600">교육 종료 후 '사후 설문'</b>이 모두 필요합니다.
+          한 가지만 작성된 응답은 분석에서 제외될 수 있습니다.<br>
+          <b class="text-rose-700">꼭 참여부탁드립니다. 감사합니다.</b>
         </p>
       </div>
     </div>
@@ -809,6 +817,45 @@ function renderAdminDanger(){
 
 /* ====== 차트 그리기 ====== */
 let charts = {};
+
+/* ====== datalabels 헬퍼 ====== */
+const _barLabelInt = {
+  display: (ctx) => Number(ctx.dataset.data[ctx.dataIndex]) > 0,
+  anchor:'end', align:'end', clip:false,
+  color:'#1e293b',
+  font:{weight:'bold', size:11},
+  formatter:(v) => Number(v) > 0 ? v : ''
+};
+const _barLabelDecimal = {
+  display: (ctx) => Number(ctx.dataset.data[ctx.dataIndex]) > 0,
+  anchor:'end', align:'end', clip:false,
+  color:'#1e293b',
+  font:{weight:'bold', size:12},
+  formatter:(v) => Number(v).toFixed(2)
+};
+const _hbarLabelInt = {
+  display: (ctx) => Number(ctx.dataset.data[ctx.dataIndex]) > 0,
+  anchor:'end', align:'end', clip:false,
+  color:'#0f766e',
+  font:{weight:'bold', size:11},
+  formatter:(v) => Number(v) > 0 ? `${v}건` : ''
+};
+const _doughnutLabel = {
+  display: (ctx) => {
+    const v = Number(ctx.dataset.data[ctx.dataIndex]) || 0;
+    const total = ctx.dataset.data.reduce((a,b)=>a+(+b||0), 0);
+    return v > 0 && total > 0;
+  },
+  color:'#fff',
+  font:{weight:'bold', size:11},
+  textAlign:'center',
+  formatter: (v, ctx) => {
+    const total = ctx.dataset.data.reduce((a,b)=>a+(+b||0), 0);
+    const pct = total ? Math.round(v / total * 100) : 0;
+    return `${v}건\n${pct}%`;
+  }
+};
+
 function drawAdminCharts(){
   if(adminTab !== 'overview') return;
   Object.values(charts).forEach(c=>c?.destroy());
@@ -822,7 +869,7 @@ function drawAdminCharts(){
   charts.brushing = new Chart(document.getElementById('chart_brushing'), {
     type:'bar',
     data:{labels:['사전','사후'], datasets:[{label:'평균 칫솔질 횟수(회/일)', data:[preBrush, postBrush], backgroundColor:['#14b8a6','#f59e0b']}]},
-    options:{plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}
+    options:{plugins:{legend:{display:false}, datalabels:_barLabelDecimal}, scales:{y:{beginAtZero:true}}, layout:{padding:{top:24}}}
   });
 
   // 2) 불소 인지도 (q8) - 분포
@@ -840,7 +887,7 @@ function drawAdminCharts(){
         {label:'사후', data:q8Counts(db.post), backgroundColor:'#f59e0b'},
       ]
     },
-    options:{scales:{y:{beginAtZero:true, ticks:{stepSize:1}}}}
+    options:{plugins:{datalabels:_barLabelInt}, scales:{y:{beginAtZero:true, ticks:{stepSize:1}}}, layout:{padding:{top:18}}}
   });
 
   // 3) 스스로 칫솔질 (q3) - 분포
@@ -858,7 +905,7 @@ function drawAdminCharts(){
         {label:'사후', data:q3Counts(db.post), backgroundColor:'#f59e0b'},
       ]
     },
-    options:{scales:{y:{beginAtZero:true, ticks:{stepSize:1}}}}
+    options:{plugins:{datalabels:_barLabelInt}, scales:{y:{beginAtZero:true, ticks:{stepSize:1}}}, layout:{padding:{top:18}}}
   });
 
   // 4) 교육 만족도 (q9) - 5지선다
@@ -867,7 +914,7 @@ function drawAdminCharts(){
   charts.satis = new Chart(document.getElementById('chart_satis'), {
     type:'doughnut',
     data:{labels:['매우 그렇다','그렇다','보통이다','그렇지 않다','전혀 그렇지 않다'], datasets:[{data:q9Counts, backgroundColor:['#10b981','#14b8a6','#f59e0b','#fb923c','#f43f5e']}]},
-    options:{plugins:{legend:{position:'bottom', labels:{font:{size:11}}}}}
+    options:{plugins:{legend:{position:'bottom', labels:{font:{size:11}}}, datalabels:_doughnutLabel}}
   });
 
   // 5) 프로그램 지속 의향 (q11) - 사후만
@@ -877,7 +924,7 @@ function drawAdminCharts(){
     charts.intent = new Chart(document.getElementById('chart_intent'), {
       type:'doughnut',
       data:{labels:['매우 원한다','원한다','보통','원하지 않는다'], datasets:[{data:q11Counts, backgroundColor:['#10b981','#14b8a6','#f59e0b','#f43f5e']}]},
-      options:{plugins:{legend:{position:'bottom', labels:{font:{size:11}}}}}
+      options:{plugins:{legend:{position:'bottom', labels:{font:{size:11}}}, datalabels:_doughnutLabel}}
     });
   }
 
@@ -888,12 +935,12 @@ function drawAdminCharts(){
     charts.behavior = new Chart(document.getElementById('chart_behavior'), {
       type:'bar',
       data:{labels:q10Items.map(s => s.length>14 ? s.slice(0,14)+'…' : s), datasets:[{label:'응답 수', data:q10Counts, backgroundColor:'#0d9488'}]},
-      options:{indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true, ticks:{stepSize:1}}}}
+      options:{indexAxis:'y', plugins:{legend:{display:false}, datalabels:_hbarLabelInt}, scales:{x:{beginAtZero:true, ticks:{stepSize:1}, grace:'15%'}}, layout:{padding:{right:32}}}
     });
   }
 }
 
-/* ====== 엑셀 다운로드 (다중 시트) ====== */
+/* ====== 엑셀 다운로드 (다중 시트 / 5개 시트) ====== */
 function downloadExcel(){
   const db = loadDB();
   const matched = matchPrePost(db);
@@ -902,8 +949,7 @@ function downloadExcel(){
   // 시트1: 사전 데이터
   const preRows = db.pre.map((r,i)=>buildExcelRow(r, COMMON_Q, i+1));
   if(preRows.length){
-    const ws = XLSX.utils.json_to_sheet(preRows);
-    XLSX.utils.book_append_sheet(wb, ws, '1.사전 데이터');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(preRows), '1.사전 데이터');
   } else {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['응답 없음']]), '1.사전 데이터');
   }
@@ -911,13 +957,12 @@ function downloadExcel(){
   // 시트2: 사후 데이터
   const postRows = db.post.map((r,i)=>buildExcelRow(r, [...COMMON_Q,...POST_EXTRA_Q], i+1));
   if(postRows.length){
-    const ws = XLSX.utils.json_to_sheet(postRows);
-    XLSX.utils.book_append_sheet(wb, ws, '2.사후 데이터');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(postRows), '2.사후 데이터');
   } else {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['응답 없음']]), '2.사후 데이터');
   }
 
-  // 시트3: 사전·사후 비교 분석
+  // 시트3: 사전·사후 비교
   if(matched.length){
     const cmpRows = matched.map((m,i)=>({
       'No': i+1,
@@ -949,12 +994,10 @@ function downloadExcel(){
   }
 
   // 시트4: 통계 요약
-  const stats = buildStats(db, matched);
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(stats), '4.통계 요약');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(buildStats(db, matched)), '4.통계 요약');
 
-  // 시트5: 시각화용 (피벗 데이터)
-  const viz = buildVizData(db);
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(viz), '5.시각화 데이터');
+  // 시트5: 시각화용 데이터(원본 숫자)
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(buildVizData(db)), '5.시각화 데이터');
 
   const fname = `유아구강보건교육_설문결과_${new Date().toISOString().slice(0,10)}.xlsx`;
   XLSX.writeFile(wb, fname);
@@ -1122,7 +1165,8 @@ async function downloadPDF(){
     }
 
     // 자리 부족하면 다음 페이지로 (현재 페이지 윗공간이 남더라도)
-    if(!firstOnPage && (currentY + imgH_mm) > (pdfH - margin)){
+    // 5mm 안전 버퍼: 폰트 디센더가 페이지 경계에서 잘리는 것 방지
+    if(!firstOnPage && (currentY + imgH_mm) > (pdfH - margin - 5)){
       pdf.addPage();
       currentY = margin;
       firstOnPage = true;
@@ -1298,7 +1342,7 @@ function buildPdfHtml(db, matched){
     </div>
   </div>
 
-  <div class="pdf-section" style="text-align:center; color:#94a3b8; font-size:11px; margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;">
+  <div class="pdf-section" style="text-align:center; color:#94a3b8; font-size:11px; margin-top:14px; border-top:1px solid #e2e8f0; padding:14px 0 30px 0;">
     동구보건소 × 울산과학대학교 치위생학과 · 문의: 유진실 교수 (010-2494-3875 / jsyu@uc.ac.kr)
   </div>
   `;
@@ -1392,40 +1436,50 @@ function buildSummary(db, matched){
 
 function drawPdfCharts(db){
   const distQ = (records, qid, n) => Array.from({length:n}, (_,i)=> records.filter(r=>r[qid]===i+1).length);
-  const opts = {responsive:false, animation:false, plugins:{legend:{labels:{font:{size:10}}}}, scales:{y:{beginAtZero:true, ticks:{stepSize:1, font:{size:9}}}, x:{ticks:{font:{size:9}}}}};
+
+  const baseOpts = {
+    responsive:false, animation:false,
+    plugins:{
+      legend:{labels:{font:{size:10}}},
+      datalabels:_barLabelInt
+    },
+    scales:{y:{beginAtZero:true, ticks:{stepSize:1, font:{size:9}}, grace:'15%'}, x:{ticks:{font:{size:9}}}},
+    layout:{padding:{top:18}}
+  };
+
   new Chart(document.getElementById('pdf_chart_q8'), {
     type:'bar',
     data:{labels:['잘 이해','대략 안다','이름만','전혀 모름'],
       datasets:[{label:'사전', data:distQ(db.pre,'q8',4), backgroundColor:'#14b8a6'},
                 {label:'사후', data:distQ(db.post,'q8',4), backgroundColor:'#f59e0b'}]},
-    options:opts
+    options: baseOpts
   });
   new Chart(document.getElementById('pdf_chart_q3'), {
     type:'bar',
     data:{labels:[['끝까지','스스로'],['대부분','스스로'],['부모가','닦아줌']],
       datasets:[{label:'사전', data:distQ(db.pre,'q3',3), backgroundColor:'#14b8a6'},
                 {label:'사후', data:distQ(db.post,'q3',3), backgroundColor:'#f59e0b'}]},
-    options:opts
+    options: baseOpts
   });
   new Chart(document.getElementById('pdf_chart_q6'), {
     type:'bar',
     data:{labels:['매번 마무리','가끔 마무리','확인만','확인안함'],
       datasets:[{label:'사전', data:distQ(db.pre,'q6',4), backgroundColor:'#14b8a6'},
                 {label:'사후', data:distQ(db.post,'q6',4), backgroundColor:'#f59e0b'}]},
-    options:opts
+    options: baseOpts
   });
   new Chart(document.getElementById('pdf_chart_q9'), {
     type:'doughnut',
     data:{labels:['매우 그렇다','그렇다','보통이다','그렇지 않다','전혀 그렇지 않다'],
       datasets:[{data:distQ(db.post,'q9',5), backgroundColor:['#10b981','#14b8a6','#f59e0b','#fb923c','#f43f5e']}]},
-    options:{responsive:false, animation:false, plugins:{legend:{position:'bottom', labels:{font:{size:10}}}}}
+    options:{responsive:false, animation:false, plugins:{legend:{position:'bottom', labels:{font:{size:10}}}, datalabels:_doughnutLabel}}
   });
   if(document.getElementById('pdf_chart_q11')){
     new Chart(document.getElementById('pdf_chart_q11'), {
       type:'doughnut',
       data:{labels:['매우 원한다','원한다','보통','원하지 않는다'],
         datasets:[{data:distQ(db.post,'q11',4), backgroundColor:['#10b981','#14b8a6','#f59e0b','#f43f5e']}]},
-      options:{responsive:false, animation:false, plugins:{legend:{position:'bottom', labels:{font:{size:10}}}}}
+      options:{responsive:false, animation:false, plugins:{legend:{position:'bottom', labels:{font:{size:10}}}, datalabels:_doughnutLabel}}
     });
   }
   if(document.getElementById('pdf_chart_q10')){
@@ -1435,7 +1489,10 @@ function drawPdfCharts(db){
       type:'bar',
       data:{labels:q10Items.map(s => s.length>16 ? s.slice(0,16)+'…' : s),
         datasets:[{label:'응답 수', data:q10Counts, backgroundColor:'#0d9488'}]},
-      options:{responsive:false, animation:false, indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true, ticks:{stepSize:1, font:{size:9}}}, y:{ticks:{font:{size:9}}}}}
+      options:{responsive:false, animation:false, indexAxis:'y',
+        plugins:{legend:{display:false}, datalabels:_hbarLabelInt},
+        scales:{x:{beginAtZero:true, ticks:{stepSize:1, font:{size:9}}, grace:'20%'}, y:{ticks:{font:{size:9}}}},
+        layout:{padding:{right:36}}}
     });
   }
 }
